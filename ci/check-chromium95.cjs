@@ -31,7 +31,7 @@ const fs = require('node:fs');
   });
   fs.writeFileSync('artifacts/chromium95/styles.json', JSON.stringify(styles, null, 2));
   if (styles.background !== 'rgba(255, 255, 255, 0.1)' || !styles.transform.includes('50')) throw new Error(`CSS compatibility failed: ${JSON.stringify(styles)}`);
-  const settings = page.locator('button').filter({has: page.locator('svg.lucide-settings')});
+  const settings = page.locator('button:has(svg.lucide-settings)');
   if (await settings.count()) {
     await settings.first().click();
   } else {

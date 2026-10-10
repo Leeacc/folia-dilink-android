@@ -54,3 +54,5 @@ commit.md
 scripts/*
 !scripts/generate-android-assets.mjs
 docs/TODO.md
+
+artifacts/
