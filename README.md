@@ -60,3 +60,5 @@ bash gradlew assembleDebug
 ## DiLink WebView 95 兼容构建
 
 依据车机反馈的 Android 12 / WebView 95.0.4638.74，脚本目标调整为 Chrome 95。构建阶段转换 CSS cascade layers、颜色格式及独立变换属性，保持原组件和布局；部分动态混色在旧内核中使用兼容回退。CI 使用真实 Chromium 95 检查首页、设置交互、透明颜色和位移样式，Android 模拟器继续验证 APK 安装和横屏。浏览器测试不等于实际车机 WebView 完整验证。
+
+动画库动态注入的 CSS 无法经过构建转换，`public/webview95.css` 在旧内核下补充等价的画布铺满规则；CI 还检查画布与其容器的实际尺寸。

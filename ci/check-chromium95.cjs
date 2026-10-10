@@ -13,7 +13,14 @@ const fs = require('node:fs');
   await page.goto('http://127.0.0.1:4173/', {waitUntil: 'domcontentloaded'});
   await page.waitForFunction(() => document.getElementById('root')?.innerText.includes('Folia'), {timeout: 30000});
   await page.waitForTimeout(20000);
+  const canvases = await page.evaluate(() => [...document.querySelectorAll('[data-paper-shader] canvas')].map(canvas => {
+    const c = canvas.getBoundingClientRect();
+    const p = canvas.parentElement.getBoundingClientRect();
+    return {width: c.width, height: c.height, parentWidth: p.width, parentHeight: p.height};
+  }));
+  fs.writeFileSync('artifacts/chromium95/canvases.json', JSON.stringify(canvases, null, 2));
   await page.screenshot({path: 'artifacts/chromium95/home.png'});
+  if (!canvases.length || canvases.some(c => Math.abs(c.width-c.parentWidth)>2 || Math.abs(c.height-c.parentHeight)>2)) throw new Error('Shader background does not fill its container');
   const before = await page.evaluate(() => ({title: document.title, text: document.body.innerText, buttons: [...document.querySelectorAll('button')].map(b => ({text: b.innerText, title: b.title, aria: b.getAttribute('aria-label')}))}));
   fs.writeFileSync('artifacts/chromium95/page.json', JSON.stringify({version, ...before, errors}, null, 2));
   if (errors.length) throw new Error(errors.join('\n'));

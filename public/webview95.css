@@ -1,0 +1,18 @@
+/* Paper Shaders injects native @layer and nested CSS at runtime, outside PostCSS.
+   Supply equivalent canvas sizing only for older WebViews. */
+@supports not (color: color-mix(in srgb, black, white)) {
+  :where([data-paper-shader]) {
+    isolation: isolate;
+    position: relative;
+  }
+  :where([data-paper-shader]) canvas {
+    contain: strict;
+    display: block;
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+  }
+}
