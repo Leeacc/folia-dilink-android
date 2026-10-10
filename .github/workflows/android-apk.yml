@@ -75,7 +75,17 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [29, 35]
+    env:
+      EXPECT_LEGACY: ${{ matrix.api == 29 }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - uses: actions/download-artifact@v4
         with:
           name: folia-dilink-test-apk
@@ -85,29 +95,20 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install and launch on Android 10
+      - name: Install and inspect landscape UI
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 29
+          api-level: ${{ matrix.api }}
           arch: x86_64
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: |
-            adb shell wm size 1080x1920
-            adb install artifacts/folia-dilink-test.apk
-            adb logcat -c
-            adb shell am start -W -n io.github.leeacc.folia.dilink/top.izuna.foliamajor.MainActivity
-            sleep 25
-            adb shell pidof io.github.leeacc.folia.dilink
-            adb shell dumpsys activity activities > artifacts/activity.txt
-            adb logcat -d > artifacts/logcat.txt
-            adb exec-out screencap -p > artifacts/launch.png
-            adb shell uiautomator dump /sdcard/window.xml
-            adb pull /sdcard/window.xml artifacts/window.xml
-            '! grep -E "FATAL EXCEPTION|Fatal signal" artifacts/logcat.txt'
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot-save
+          script: bash ci/smoke-android.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: android-10-smoke-test
-          path: artifacts/
+          name: android-${{ matrix.api }}-smoke-test
+          path: |
+            artifacts/*.txt
+            artifacts/*.png
+            artifacts/*.json
           retention-days: 30

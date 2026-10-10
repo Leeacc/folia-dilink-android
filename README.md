@@ -9,7 +9,7 @@
 3. 在 **Artifacts** 下载 **folia-dilink-test-apk**，解压得到 `folia-dilink-test.apk`。
 4. `SHA256SUMS.txt` 是 APK 校验值；`apk-info.txt` 和 `signature.txt` 是包信息与签名校验记录。
 
-产物保留 30 天，过期可点击 **Run workflow** 重建。`android-10-smoke-test` 包含模拟器启动截图和日志；模拟器测试不等于车机兼容性验证。
+产物保留 30 天，过期可点击 **Run workflow** 重建。`android-29-smoke-test` 和 `android-35-smoke-test` 包含模拟器启动截图和日志；模拟器测试不等于车机兼容性验证。
 
 ## 来源与实际版本
 
@@ -22,8 +22,8 @@
 - 主 Activity 固定为 landscape，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
 - 版本名 `0.6.7-dilink-test`；CI versionCode 使用运行编号。
-- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 7 / API 24，target API 36。
-- 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。前端代码不作改写。
+- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 7 / API 24，target API 36。**显示原版 UI 还要求 Android System WebView 111+**，最低安装版本不等于最低可用 WebView 版本。
+- 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。原版 `src/` 代码不作改写；构建目标明确为 Chrome/WebView 111，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
 
 上游根 README 的 Node 20+/JDK 17 提示与实际源码要求不一致；以以上工程版本为准。
@@ -55,4 +55,4 @@ cd android
 bash gradlew assembleDebug
 ```
 
-需要上述 Node/JDK/SDK 工具链。CI 会先运行 Android 平台与 API 路由单测，再构建 Web 资源和 APK，校验签名、包名、最低系统版本、横屏声明及内置页面，并在 Android 10 模拟器安装启动。
+需要上述 Node/JDK/SDK 工具链。CI 会先运行 Android 平台与 API 路由单测，再构建 Web 资源和 APK，校验签名、包名、最低系统版本、横屏声明及内置页面，并在 API 29 模拟器验证旧 WebView 提示页、API 35 模拟器验证原版页面实际渲染及横屏。

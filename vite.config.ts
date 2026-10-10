@@ -197,6 +197,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       format: 'es'
     },
     build: {
+      ...(isCapacitorBuild ? { target: 'chrome111' } : {}),
       rollupOptions: {
         input: {
           main: 'index.html',

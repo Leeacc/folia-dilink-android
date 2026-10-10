@@ -8,7 +8,11 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   loggingBehavior: 'debug',
   backgroundColor: '#09090b',
+  android: {
+    minWebViewVersion: 111,
+  },
   server: {
+    errorPath: 'unsupported-webview.html',
     androidScheme: 'https',
     hostname: 'localhost',
     cleartext: false,
