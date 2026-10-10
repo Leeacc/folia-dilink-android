@@ -9,7 +9,7 @@ const config: CapacitorConfig = {
   loggingBehavior: 'debug',
   backgroundColor: '#09090b',
   android: {
-    minWebViewVersion: 111,
+    minWebViewVersion: 95,
   },
   server: {
     errorPath: 'unsupported-webview.html',

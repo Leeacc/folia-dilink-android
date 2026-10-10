@@ -44,6 +44,20 @@ jobs:
         run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts
       - name: Build and sync original Folia UI
         run: npm run cap:sync:android
+      - name: Verify compiled UI on Chromium 95
+        run: |
+          npm install --prefix "$RUNNER_TEMP/legacy-pw" --ignore-scripts --no-audit --no-fund playwright@1.15.2
+          curl -fL --retry 3 https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/920619/chromium-linux.zip -o "$RUNNER_TEMP/chromium95.zip"
+          unzip -q "$RUNNER_TEMP/chromium95.zip" -d "$RUNNER_TEMP/chromium95"
+          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/preview.log" 2>&1 &
+          sleep 3
+          FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-chromium95.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium95-ui-check
+          path: artifacts/chromium95/
+          if-no-files-found: ignore
       - name: Assemble debug APK
         working-directory: android
         run: bash gradlew --no-daemon assembleDebug

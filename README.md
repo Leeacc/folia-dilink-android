@@ -21,9 +21,9 @@
 
 - 主 Activity 固定为 landscape，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-test`；CI versionCode 使用运行编号。
-- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 7 / API 24，target API 36。**显示原版 UI 还要求 Android System WebView 111+**，最低安装版本不等于最低可用 WebView 版本。
-- 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。原版 `src/` 代码不作改写；构建目标明确为 Chrome/WebView 111，低于此版本显示独立兼容性提示页，避免黑屏。
+- 版本名 `0.6.7-dilink-wv95`；CI versionCode 使用运行编号。
+- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 7 / API 24，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
+- 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。原版 `src/` 代码不作改写；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
 
 上游根 README 的 Node 20+/JDK 17 提示与实际源码要求不一致；以以上工程版本为准。
@@ -56,3 +56,7 @@ bash gradlew assembleDebug
 ```
 
 需要上述 Node/JDK/SDK 工具链。CI 会先运行 Android 平台与 API 路由单测，再构建 Web 资源和 APK，校验签名、包名、最低系统版本、横屏声明及内置页面，并在 API 29 模拟器验证旧 WebView 提示页、API 35 模拟器验证原版页面实际渲染及横屏。
+
+## DiLink WebView 95 兼容构建
+
+依据车机反馈的 Android 12 / WebView 95.0.4638.74，脚本目标调整为 Chrome 95。构建阶段转换 CSS cascade layers、颜色格式及独立变换属性，保持原组件和布局；部分动态混色在旧内核中使用兼容回退。CI 使用真实 Chromium 95 检查首页、设置交互、透明颜色和位移样式，Android 模拟器继续验证 APK 安装和横屏。浏览器测试不等于实际车机 WebView 完整验证。
