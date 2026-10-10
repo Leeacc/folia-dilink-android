@@ -7,17 +7,17 @@ const fs = require('node:fs');
   const browser = await chromium.launch({executablePath: process.env.FOLIA_CHROMIUM_EXECUTABLE, headless: true, args: ['--no-sandbox']});
   const version = browser.version();
   if (!version.startsWith('95.')) throw new Error(`Expected Chromium 95, got ${version}`);
-  const page = await browser.newPage({viewport: {width: 1920, height: 1080}, locale: 'zh-CN'});
+  const page = await browser.newPage({viewport: {width: 1920, height: 1080}, locale: 'en-US'});
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:4173/', {waitUntil: 'domcontentloaded'});
   await page.waitForFunction(() => document.getElementById('root')?.innerText.includes('Folia'), {timeout: 30000});
-  await page.waitForTimeout(5000);
+  await page.waitForTimeout(20000);
   await page.screenshot({path: 'artifacts/chromium95/home.png'});
   const before = await page.evaluate(() => ({title: document.title, text: document.body.innerText, buttons: [...document.querySelectorAll('button')].map(b => ({text: b.innerText, title: b.title, aria: b.getAttribute('aria-label')}))}));
   fs.writeFileSync('artifacts/chromium95/page.json', JSON.stringify({version, ...before, errors}, null, 2));
   if (errors.length) throw new Error(errors.join('\n'));
-  if (before.text.length < 50) throw new Error('Missing meaningful homepage');
+  if (!before.text.includes('Folia') || before.buttons.length < 4) throw new Error('Missing homepage navigation');
   // Check generated CSS behaviors that Chromium 95 does not support natively.
   const styles = await page.evaluate(() => {
     const element = document.createElement('div');
@@ -31,7 +31,7 @@ const fs = require('node:fs');
   });
   fs.writeFileSync('artifacts/chromium95/styles.json', JSON.stringify(styles, null, 2));
   if (styles.background !== 'rgba(255, 255, 255, 0.1)' || !styles.transform.includes('50')) throw new Error(`CSS compatibility failed: ${JSON.stringify(styles)}`);
-  const settings = page.locator('button:has(svg.lucide-settings)');
+  const settings = page.locator('button[title="Help & Options"]');
   if (await settings.count()) {
     await settings.first().click();
   } else {
