@@ -1,0 +1,110 @@
+name: Build DiLink test APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      FOLIA_ANDROID_VERSION_CODE: ${{ github.run_number }}
+      VITE_NETEASE_API_BASE: ${{ vars.VITE_NETEASE_API_BASE }}
+      VITE_KUGOU_API_BASE: ${{ vars.VITE_KUGOU_API_BASE }}
+      VITE_FOLIA_API_BASE: ${{ vars.VITE_FOLIA_API_BASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install required SDK
+        run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0' 'platform-tools'
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Test Android runtime and API routing
+        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts
+      - name: Build and sync original Folia UI
+        run: npm run cap:sync:android
+      - name: Assemble debug APK
+        working-directory: android
+        run: bash gradlew --no-daemon assembleDebug
+      - name: Verify and collect APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/folia-dilink-test.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose artifacts/folia-dilink-test.apk > artifacts/signature.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging artifacts/folia-dilink-test.apk > artifacts/apk-info.txt
+          grep -F "name='io.github.leeacc.folia.dilink'" artifacts/apk-info.txt
+          grep -F "sdkVersion:'24'" artifacts/apk-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree artifacts/folia-dilink-test.apk AndroidManifest.xml > artifacts/manifest.txt
+          grep -F 'android:screenOrientation' artifacts/manifest.txt | grep -F '0x0'
+          unzip -l artifacts/folia-dilink-test.apk | grep 'assets/public/index.html'
+          cp UPSTREAM.json artifacts/
+          printf '%s\n' "$GITHUB_SHA" > artifacts/BUILD_COMMIT.txt
+          (cd artifacts && sha256sum folia-dilink-test.apk > SHA256SUMS.txt)
+          cat artifacts/apk-info.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: folia-dilink-test-apk
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 30
+
+  smoke-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: folia-dilink-test-apk
+          path: artifacts
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install and launch on Android 10
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb shell wm size 1080x1920
+            adb install artifacts/folia-dilink-test.apk
+            adb logcat -c
+            adb shell am start -W -n io.github.leeacc.folia.dilink/top.izuna.foliamajor.MainActivity
+            sleep 25
+            adb shell pidof io.github.leeacc.folia.dilink
+            adb shell dumpsys activity activities > artifacts/activity.txt
+            adb logcat -d > artifacts/logcat.txt
+            adb exec-out screencap -p > artifacts/launch.png
+            adb shell uiautomator dump /sdcard/window.xml
+            adb pull /sdcard/window.xml artifacts/window.xml
+            '! grep -E "FATAL EXCEPTION|Fatal signal" artifacts/logcat.txt'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-10-smoke-test
+          path: artifacts/
+          retention-days: 30
