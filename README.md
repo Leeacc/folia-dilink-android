@@ -71,3 +71,5 @@ bash gradlew assembleDebug
 - 二维码请求超过 15 秒显示连接失败；错误状态不再显示旋转图标。
 - 桌面程序使用 Node 音乐 API；Capacitor 不包含该桌面进程。QQ 音乐在较新 folia-major 中实现，当前 0.6.7 Android 示例没有 QQ provider，也没有 QQ 服务端配置。
 - 未提供服务地址时，在线登录和播放问题尚未解决，本版只修复全屏处理和错误呈现。
+
+Capacitor 8.4.2 的 Cordova 生命周期转发在启动早期或独立错误页上可能先于网页桥接执行；postinstall 脚本为该调用添加初始化判断，避免 triggerEvent 未定义报错。依赖源码改变时补丁会明确失败，要求重新审查。
