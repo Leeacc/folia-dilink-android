@@ -1,7 +1,9 @@
 package top.izuna.foliamajor;
 
 import android.os.Bundle;
+import android.os.Build;
 import android.view.View;
+import android.view.WindowManager;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -44,6 +46,10 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void enterFullscreen() {
+        // Older Android splash/window code can restore the status bar after UI flags change.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        }
         WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(
             getWindow(), getWindow().getDecorView()
         );
