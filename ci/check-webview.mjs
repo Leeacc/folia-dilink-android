@@ -39,3 +39,33 @@ if (webViewMajor < 95) {
 }
 
 if (dom.width !== dom.screenWidth || dom.height !== dom.screenHeight) throw new Error('Emulator system bars are not hidden');
+
+if (webViewMajor >= 95) {
+  const native = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve, reject) => { native.addEventListener('open', resolve, {once:true}); native.addEventListener('error', reject, {once:true}); });
+  const result = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Embedded runtime check timed out')), 120000);
+    native.addEventListener('message', event => {
+      const data = JSON.parse(event.data);
+      if (data.id === 2) { clearTimeout(timer); resolve(data); }
+    });
+  });
+  native.send(JSON.stringify({ id:2, method:'Runtime.evaluate', params:{awaitPromise:true,returnByValue:true,expression:`(async () => {
+    const request = (provider,endpoint) => window.Capacitor.nativePromise('EmbeddedMusic','request',{provider,endpoint});
+    const generated = await request('netease','/login/qr/create?key=integration-test&qrimg=true');
+    if (!generated.data?.data?.qrimg?.startsWith('data:image/png;base64,')) throw new Error('Embedded QR generation failed');
+    const network = {};
+    for (const provider of ['netease','kugou']) {
+      try {
+        const result = await request(provider,'/login/qr/key');
+        network[provider] = Boolean(result.data?.data?.unikey || result.data?.data?.qrcode);
+      } catch { network[provider] = false; }
+    }
+    return {embeddedQr:true, network};
+  })()`}}));
+  const inspected = await result;
+  native.close();
+  if (inspected.result?.exceptionDetails) throw new Error(JSON.stringify(inspected.result.exceptionDetails));
+  writeFileSync('artifacts/embedded-music.json', JSON.stringify(inspected.result.result.value, null, 2));
+  console.log('Embedded music:', inspected.result.result.value);
+}

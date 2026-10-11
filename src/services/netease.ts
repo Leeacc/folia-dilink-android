@@ -1,6 +1,8 @@
 import { NeteaseUser, NeteasePlaylist, NoCopyrightRecommendation, SongPrivilege, SongResult } from "../types";
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './onlineMusic/providerStorage';
 
+import { hasEmbeddedMusic, requestEmbeddedMusic } from './embeddedMusic';
+
 type UnavailableSongReplacement = {
   replacementSong: SongResult;
   replacementSongId: number;
@@ -35,9 +37,10 @@ const getConfiguredApiBase = () => {
   return null;
 };
 
-export const isNeteaseApiConfigured = (): boolean => isElectronRuntime() || Boolean(getConfiguredApiBase());
+export const isNeteaseApiConfigured = (): boolean => hasEmbeddedMusic() || isElectronRuntime() || Boolean(getConfiguredApiBase());
 
 const getApiBase = async () => {
+  if (hasEmbeddedMusic()) return 'https://embedded.invalid';
   if (API_BASE) return API_BASE;
 
   if (isElectronRuntime()) {
@@ -53,6 +56,14 @@ const getApiBase = async () => {
   }
 
   throw new Error("Failed to access environment variables for API base. Please configure VITE_NETEASE_API_BASE.");
+};
+
+const musicJson = async (url: string, options?: RequestInit) => {
+  if (hasEmbeddedMusic()) {
+    const parsed = new URL(url);
+    return requestEmbeddedMusic('netease', parsed.pathname + parsed.search);
+  }
+  return fetch(url, options).then(response => response.json());
 };
 
 const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
@@ -94,7 +105,7 @@ const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
       let anonCookie = readProviderSessionValue('netease', 'anonymous_cookie', ['netease_anonymous_cookie']);
       if (!anonCookie && !endpoint.startsWith('/register/anonimous')) {
         try {
-          const anonRes = await fetch(`${base}/register/anonimous?timestamp=${Date.now()}`).then(r => r.json());
+          const anonRes = await musicJson(`${base}/register/anonimous?timestamp=${Date.now()}`);
           if (anonRes && typeof anonRes.cookie === 'string' && anonRes.cookie) {
             anonCookie = anonRes.cookie;
             writeProviderSessionValue('netease', 'anonymous_cookie', anonRes.cookie);
@@ -113,8 +124,7 @@ const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
     finalUrl = `${finalUrl}${sep}cookie=${encodeURIComponent(cookieToUse)}`;
   }
 
-  const res = await fetch(finalUrl, { ...defaultOptions, credentials: 'include' });
-  const data = await res.json();
+  const data = await musicJson(finalUrl, { ...defaultOptions, credentials: 'include' });
 
   if (!storedCookie && cookieToUse && (data?.code === 301 || data?.code === 401 || data?.code === 403)) {
     removeProviderSessionValue('netease', 'anonymous_cookie', ['netease_anonymous_cookie']);

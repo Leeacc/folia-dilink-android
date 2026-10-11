@@ -37,7 +37,7 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - name: Install required SDK
-        run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0' 'platform-tools'
+        run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0' 'platform-tools' 'ndk;27.2.12479018' 'cmake;3.22.1'
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Test Android runtime and API routing
@@ -58,6 +58,8 @@ jobs:
           name: chromium95-ui-check
           path: artifacts/chromium95/
           if-no-files-found: ignore
+      - name: Package embedded music runtime
+        run: python3 mobile/prepare.py
       - name: Assemble debug APK
         working-directory: android
         run: bash gradlew --no-daemon assembleDebug
@@ -70,7 +72,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose artifacts/folia-dilink-test.apk > artifacts/signature.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging artifacts/folia-dilink-test.apk > artifacts/apk-info.txt
           grep -F "name='io.github.leeacc.folia.dilink'" artifacts/apk-info.txt
-          grep -F "sdkVersion:'24'" artifacts/apk-info.txt
+          grep -F "sdkVersion:'26'" artifacts/apk-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree artifacts/folia-dilink-test.apk AndroidManifest.xml > artifacts/manifest.txt
           grep -F 'android:screenOrientation' artifacts/manifest.txt | grep -F '0x0'
           unzip -l artifacts/folia-dilink-test.apk | grep 'assets/public/index.html'

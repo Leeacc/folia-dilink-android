@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OnlineProviderId, QrLoginState } from '../types/onlineMusic';
 import { omni } from '../services/onlineMusic/omni';
 import { isNeteaseApiConfigured } from '../services/netease';
+import { hasEmbeddedMusic } from '../services/embeddedMusic';
 import { withLoginTimeout } from '../services/onlineMusic/loginTimeout';
 
 // src/hooks/useOnlineProviderQrLogin.ts
@@ -71,7 +72,7 @@ export const useOnlineProviderQrLogin = ({
         }
 
         try {
-            const { key, imageUrl } = await withLoginTimeout(omni.createQrLogin(targetProviderId));
+            const { key, imageUrl } = await withLoginTimeout(omni.createQrLogin(targetProviderId), hasEmbeddedMusic() ? 90000 : 15000);
             if (sessionId !== sessionIdRef.current) return;
             setQrCodeImg(imageUrl);
             setQrState('waiting');

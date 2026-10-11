@@ -1,4 +1,5 @@
 import md5 from 'blueimp-md5';
+import { hasEmbeddedMusic, requestEmbeddedMusic } from '../embeddedMusic';
 import { OnlineProviderError } from '../../types/onlineMusic';
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './providerStorage';
 import { resolveFoliaApiUrl } from '../webApi';
@@ -195,6 +196,7 @@ const persistWebSession = (response: any): void => {
 };
 
 export const getKugouTransportAvailability = () => {
+    if (hasEmbeddedMusic()) return { configured: true } as const;
     if (typeof window !== 'undefined' && window.electron?.kugouRequest) return { configured: true } as const;
     return getWebApiBase()
         ? { configured: true } as const
@@ -209,6 +211,13 @@ export const requestKugou = async <T = unknown>(operation: KugouOperation, param
         return response as T;
     }
 
+    if (hasEmbeddedMusic()) {
+        const query = new URLSearchParams();
+        Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+        const result = await requestEmbeddedMusic('kugou', `${ENDPOINTS[operation]}?${query}`);
+        persistWebSession(result);
+        return result as T;
+    }
     const base = getWebApiBase();
     if (!base) {
         throw new OnlineProviderError('unavailable', 'VITE_KUGOU_API_BASE is not configured', 'kugou');

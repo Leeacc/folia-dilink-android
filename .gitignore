@@ -56,3 +56,7 @@ scripts/*
 docs/TODO.md
 
 artifacts/
+
+android/app/libnode/
+android/app/.cxx/
+android/app/src/main/assets/music-runtime.zip

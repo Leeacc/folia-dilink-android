@@ -20,12 +20,16 @@ android {
             minorApiLevel = 1
         }
     }
+    ndkVersion "27.2.12479018"
+    externalNativeBuild { cmake { path "CMakeLists.txt"; version "3.22.1" } }
     defaultConfig {
+        ndk { abiFilters "arm64-v8a", "armeabi-v7a", "x86_64" }
+        externalNativeBuild { cmake { arguments "-DANDROID_STL=c++_shared" } }
         applicationId "io.github.leeacc.folia.dilink"
-        minSdkVersion rootProject.ext.minSdkVersion
+        minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode Integer.parseInt(System.getenv('FOLIA_ANDROID_VERSION_CODE') ?: '1')
-        versionName "${packageJson.version}-dilink-wv95-r2"
+        versionName "${packageJson.version}-dilink-embedded-r3"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

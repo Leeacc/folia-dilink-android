@@ -1,0 +1,7 @@
+cmake_minimum_required(VERSION 3.22.1)
+project(folia_runtime)
+add_library(node SHARED IMPORTED)
+set_target_properties(node PROPERTIES IMPORTED_LOCATION ${CMAKE_SOURCE_DIR}/libnode/bin/${ANDROID_ABI}/libnode.so)
+add_library(folia-runtime SHARED src/main/cpp/runtime.cpp)
+target_include_directories(folia-runtime PRIVATE libnode/include/node)
+target_link_libraries(folia-runtime node android log)
