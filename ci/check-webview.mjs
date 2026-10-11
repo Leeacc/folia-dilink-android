@@ -20,7 +20,7 @@ const response = new Promise((resolve, reject) => {
   });
 });
 ws.send(JSON.stringify({id: 1, method: 'Runtime.evaluate', params: {
-  expression: 'JSON.stringify({text:document.body.innerText,children:(document.getElementById("root") ? document.getElementById("root").children.length : 0),width:innerWidth,height:innerHeight,userAgent:navigator.userAgent})',
+  expression: 'JSON.stringify({text:document.body.innerText,children:(document.getElementById("root") ? document.getElementById("root").children.length : 0),width:innerWidth,height:innerHeight,screenWidth:screen.width,screenHeight:screen.height,userAgent:navigator.userAgent})',
   returnByValue: true,
 }}));
 const message = await response;
@@ -35,3 +35,5 @@ if (process.env.EXPECT_LEGACY === 'true') {
 } else {
   if (!dom.children || dom.text.trim().length < 50) throw new Error('Folia UI did not render');
 }
+
+if (dom.width !== dom.screenWidth || dom.height !== dom.screenHeight) throw new Error('Emulator system bars are not hidden');

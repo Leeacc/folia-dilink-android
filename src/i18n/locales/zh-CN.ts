@@ -419,6 +419,8 @@ export default {
     "onlineProvider": "在线音乐平台",
     "providerNotLoggedIn": "未登录·点击扫码",
     "providerNotConfigured": "Web 端未配置 API",
+    "musicServiceMissing": "尚未连接音乐服务，无法生成登录二维码。需要先配置此平台的服务地址。",
+    "musicServiceFailed": "无法连接音乐服务或服务响应异常，请检查网络和服务地址后重试。",
     "loadingQr": "加载二维码...",
     "scanQr": "请扫描二维码",
     "qrExpired": "二维码已过期，请刷新。",

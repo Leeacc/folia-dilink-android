@@ -1,4 +1,4 @@
-import { Loader2, RotateCcw, X } from 'lucide-react';
+import { Loader2, RotateCcw, X, CircleAlert } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 // src/components/app/home/OnlineProviderLoginModal.tsx
@@ -60,7 +60,7 @@ const OnlineProviderLoginModal = ({
                         <img src={qrCodeImg} alt="QR Code" className="w-40 h-40" />
                     ) : (
                         <div className="w-40 h-40 flex items-center justify-center bg-gray-100 rounded-lg">
-                            <Loader2 className="animate-spin text-gray-400" size={24} />
+                            {state === 'error' || state === 'expired' ? <CircleAlert className="text-gray-500" size={28} /> : <Loader2 className="animate-spin text-gray-400" size={24} />}
                         </div>
                     )}
                 </div>

@@ -35,6 +35,8 @@ const getConfiguredApiBase = () => {
   return null;
 };
 
+export const isNeteaseApiConfigured = (): boolean => isElectronRuntime() || Boolean(getConfiguredApiBase());
+
 const getApiBase = async () => {
   if (API_BASE) return API_BASE;
 

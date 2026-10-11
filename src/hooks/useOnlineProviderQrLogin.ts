@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { OnlineProviderId, QrLoginState } from '../types/onlineMusic';
 import { omni } from '../services/onlineMusic/omni';
+import { isNeteaseApiConfigured } from '../services/netease';
+import { withLoginTimeout } from '../services/onlineMusic/loginTimeout';
 
 // src/hooks/useOnlineProviderQrLogin.ts
 
@@ -29,6 +31,7 @@ export const useOnlineProviderQrLogin = ({
     t: (key: string) => string;
 }) => {
     const [qrCodeImg, setQrCodeImg] = useState('');
+    const [errorText, setErrorText] = useState('');
     const [qrState, setQrState] = useState<QrUiState>('idle');
     const qrCheckTimeoutRef = useRef<number | null>(null);
     const sessionIdRef = useRef(0);
@@ -52,7 +55,14 @@ export const useOnlineProviderQrLogin = ({
         stopChecking();
         const sessionId = sessionIdRef.current;
         setQrCodeImg('');
+        setErrorText('');
         setQrState('loading');
+        if ((targetProviderId === 'netease' && !isNeteaseApiConfigured())
+            || !omni.getProviderAvailability(targetProviderId).configured) {
+            setErrorText(t('home.musicServiceMissing'));
+            setQrState('error');
+            return;
+        }
         lastLoggedQrStateRef.current = 'loading';
         console.info('[ProviderQrLogin] start', { providerId: targetProviderId });
         if (!omni.getProviderCapabilities(targetProviderId).auth) {
@@ -61,7 +71,7 @@ export const useOnlineProviderQrLogin = ({
         }
 
         try {
-            const { key, imageUrl } = await omni.createQrLogin(targetProviderId);
+            const { key, imageUrl } = await withLoginTimeout(omni.createQrLogin(targetProviderId));
             if (sessionId !== sessionIdRef.current) return;
             setQrCodeImg(imageUrl);
             setQrState('waiting');
@@ -71,7 +81,7 @@ export const useOnlineProviderQrLogin = ({
             const poll = async () => {
                 if (sessionId !== sessionIdRef.current) return;
                 try {
-                    const result = await omni.checkQrLogin(targetProviderId, key);
+                    const result = await withLoginTimeout(omni.checkQrLogin(targetProviderId, key));
                     if (sessionId !== sessionIdRef.current) return;
                     setQrState(result.state);
                     if (lastLoggedQrStateRef.current !== result.state) {
@@ -96,6 +106,7 @@ export const useOnlineProviderQrLogin = ({
                         name: error instanceof Error ? error.name : 'Error',
                         message: error instanceof Error ? error.message : String(error),
                     });
+                    setErrorText(t('home.musicServiceFailed'));
                     setQrState('error');
                     qrCheckTimeoutRef.current = null;
                 }
@@ -108,16 +119,17 @@ export const useOnlineProviderQrLogin = ({
                 name: error instanceof Error ? error.name : 'Error',
                 message: error instanceof Error ? error.message : String(error),
             });
+            setErrorText(t('home.musicServiceFailed'));
             setQrState('error');
         }
-    }, [providerId, stopChecking]);
+    }, [providerId, stopChecking, t]);
 
     useEffect(() => stopChecking, [stopChecking]);
 
     return {
         qrCodeImg,
         qrState,
-        qrStatusText: getQrStatusText(qrState, t),
+        qrStatusText: qrState === 'error' && errorText ? errorText : getQrStatusText(qrState, t),
         isConfirmed: qrState === 'confirmed',
         start,
         stop: stopChecking,

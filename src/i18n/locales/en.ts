@@ -418,6 +418,8 @@ export default {
     "onlineProvider": "Online music provider",
     "providerNotLoggedIn": "Not signed in · click to scan",
     "providerNotConfigured": "API is not configured for Web",
+    "musicServiceMissing": "No music service is connected. Configure the service address before signing in.",
+    "musicServiceFailed": "The music service could not be reached or returned an invalid response. Check the connection and service address, then retry.",
     "loadingQr": "Loading QR...",
     "scanQr": "Please scan the QR code",
     "qrExpired": "QR Code expired. Refresh to try again.",
