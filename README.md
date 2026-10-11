@@ -55,7 +55,7 @@ cd android
 bash gradlew assembleDebug
 ```
 
-需要上述 Node/JDK/SDK 工具链。CI 会先运行 Android 平台与 API 路由单测，再构建 Web 资源和 APK，校验签名、包名、最低系统版本、横屏声明及内置页面，并在 API 29 模拟器验证旧 WebView 提示页、API 35 模拟器验证原版页面实际渲染及横屏。
+需要上述 Node/JDK/SDK 工具链。CI 会先运行 Android 平台与 API 路由单测，再构建 Web 资源和 APK，校验签名、包名、最低系统版本、横屏声明及内置页面，并在 API 29/31 模拟器验证旧 WebView 提示页、API 35 模拟器验证原版页面实际渲染；全部检查横屏与系统栏隐藏。
 
 ## DiLink WebView 95 兼容构建
 

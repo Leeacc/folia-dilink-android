@@ -30,7 +30,9 @@ const dom = JSON.parse(message.result.result.value);
 writeFileSync('artifacts/webview.json', JSON.stringify(dom, null, 2));
 console.log(dom);
 if (dom.width <= dom.height) throw new Error('Expected landscape WebView');
-if (process.env.EXPECT_LEGACY === 'true') {
+const webViewMajor = Number(dom.userAgent.match(/Chrome\/(\d+)/)?.[1]);
+if (!webViewMajor) throw new Error('Cannot identify WebView version');
+if (webViewMajor < 95) {
   if (!dom.text.includes('Folia') || !dom.text.includes('WebView')) throw new Error('Missing compatibility message');
 } else {
   if (!dom.children || dom.text.trim().length < 50) throw new Error('Folia UI did not render');

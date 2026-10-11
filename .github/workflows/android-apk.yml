@@ -93,8 +93,6 @@ jobs:
       fail-fast: false
       matrix:
         api: [29, 31, 35]
-    env:
-      EXPECT_LEGACY: ${{ matrix.api == 29 }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
