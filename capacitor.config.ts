@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   appId: 'io.github.leeacc.folia.dilink',
   appName: 'Folia',
   webDir: 'dist',
-  loggingBehavior: 'debug',
+  loggingBehavior: 'none',
   backgroundColor: '#09090b',
   android: {
     minWebViewVersion: 95,
