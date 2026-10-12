@@ -8,6 +8,9 @@ const stateDir = process.argv[2];
 const secret = process.argv[3];
 if (!stateDir || !secret) throw new Error('Private runtime arguments missing');
 process.env.TMPDIR = stateDir;
+// Android may suppress safeGetenv under its app security context. All desktop adapters
+// must use our writable private directory rather than falling back to /tmp.
+require('node:os').tmpdir = () => stateDir;
 process.env.platform = 'lite';
 fs.mkdirSync(stateDir, { recursive: true });
 const tokenPath = path.join(stateDir, 'anonymous_token');
@@ -67,7 +70,7 @@ const server = http.createServer(async (req, res) => {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;
     if (body) res.end(JSON.stringify({ data: body }));
-    else { res.end(JSON.stringify({ data: {code:502, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64)} })); }
+    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64)} })); }
   }
 });
 server.listen(0, '127.0.0.1', () => {

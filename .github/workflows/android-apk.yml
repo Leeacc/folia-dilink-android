@@ -41,7 +41,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Test Android runtime and API routing
-        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts test/unit/services/loginTimeout.test.ts
+        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts test/unit/services/loginTimeout.test.ts test/unit/services/androidMedia.test.ts
       - name: Build and sync original Folia UI
         run: npm run cap:sync:android
       - name: Verify compiled UI on Chromium 95
