@@ -19,6 +19,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         if (bridge != null) {
+            bridge.getWebView().setWebViewClient(new MusicWebViewClient(bridge));
             View container = (View) bridge.getWebView().getParent();
             ViewCompat.setOnApplyWindowInsetsListener(container, (view, windowInsets) -> {
                 Insets safe = windowInsets.getInsets(

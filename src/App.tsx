@@ -1,3 +1,5 @@
+import { isCapacitorAndroid } from './platform/runtime';
+import { androidMediaUrl } from './services/androidMedia';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useMotionValue, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -2914,7 +2916,7 @@ export default function App() {
             }}
             audioElement={<audio
                 ref={audioRef}
-                src={audioSrc || undefined}
+                src={androidMediaUrl(audioSrc)}
                 preload="auto"
                 crossOrigin="anonymous"
                 loop={effectiveLoopMode === 'one'}
@@ -3159,6 +3161,13 @@ export default function App() {
                     />
                 )}
             </div>
+
+            {isCapacitorAndroid() && currentView === 'player' && (
+                <button type="button" aria-label="返回选歌" onClick={navigateBackFromPlayer}
+                    className="fixed top-4 left-4 z-[100] min-h-12 px-4 rounded-full bg-black/70 text-white flex items-center gap-2">
+                    <ChevronLeft size={24} />返回选歌
+                </button>
+            )}
 
             {currentView === 'player' && isObsBrowserSourceRendering && (
                 <ObsBrowserSourceLyrics

@@ -67,7 +67,7 @@ const server = http.createServer(async (req, res) => {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;
     if (body) res.end(JSON.stringify({ data: body }));
-    else { res.writeHead(502); res.end(JSON.stringify({ error: 'Embedded music request failed' })); }
+    else { res.end(JSON.stringify({ data: {code:502, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64)} })); }
   }
 });
 server.listen(0, '127.0.0.1', () => {

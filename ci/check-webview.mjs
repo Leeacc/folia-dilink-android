@@ -58,7 +58,7 @@ if (webViewMajor >= 95) {
     for (const provider of ['netease','kugou']) {
       try {
         const result = await request(provider,'/login/qr/key');
-        network[provider] = Boolean(result.data?.data?.unikey || result.data?.data?.qrcode);
+        network[provider] = {key:Boolean(result.data?.data?.unikey || result.data?.data?.qrcode), code:result.data?.code, diagnostic:result.data?.diagnostic, message: typeof result.data?.msg === 'string' ? result.data.msg.replace(/https?:[^ ]+/g,'[host]').slice(0,160) : undefined};
       } catch { network[provider] = false; }
     }
     return {embeddedQr:true, network};
