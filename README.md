@@ -1,6 +1,6 @@
 # Folia for DiLink — 横屏测试版
 
-面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 原版界面，仅配置横屏和自动构建；尚未在真实车机验证，不是官方 Android 客户端。
+面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云与酷狗音乐服务。车机已反馈全屏正常，登录和播放仍需逐版实测；不是官方 Android 客户端。
 
 ## 下载 APK（无需 Android Studio）
 
@@ -21,8 +21,8 @@
 
 - 主 Activity 固定为 landscape，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-wv95-r2`；CI versionCode 使用运行编号。
-- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 7 / API 24，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
+- 版本名 `0.6.7-dilink-embedded-r4`；CI versionCode 使用运行编号。
+- 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 8 / API 26，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
 - 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。保留原版组件和布局，补充 Android 系统栏处理及登录失败提示；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
 
@@ -30,19 +30,13 @@
 
 ## 功能边界与后端
 
-这是可安装的界面/前台播放测试包，不包含音乐服务端。未配置后端时，在线音乐登录、搜索或播放可能不可用；本地音乐扫描在上游 Android 示例中不受支持。后台保活、锁屏播放、方向盘按键、车机媒体中心接入都不在本次范围。
+这是可安装的前台播放测试包。Android 已内置网易云与酷狗 API，**无需部署音乐服务器或填写服务地址**。本地音乐扫描、后台保活、锁屏播放、方向盘按键、车机媒体中心接入不在本次范围。
 
-可在 **Settings → Secrets and variables → Actions → Variables** 设置以下可选的公开 HTTPS 服务地址，然后重新运行工作流：
-
-- `VITE_NETEASE_API_BASE`：自行部署的网易云 API。
-- `VITE_KUGOU_API_BASE`：自行部署的酷狗 API。
-- `VITE_FOLIA_API_BASE`：自行部署的 Folia AI / 歌词代理 API，通常以 `/api` 结尾。
-
-这些值会打包进 APK，不能填入 API 密钥。AI 密钥仅放在你自己的服务端。本项目不会自动部署后端或使用你的音乐账号。Navidrome 也需要可访问的 HTTPS 服务。
+网页部署仍可配置 `VITE_NETEASE_API_BASE`、`VITE_KUGOU_API_BASE`；Android 版优先调用包内服务，不依赖这些变量。AI/通用歌词代理和用户自己的 Navidrome 仍是独立可选功能，不是网易云/酷狗登录的前提。不要将 API 密钥放入公开构建变量。
 
 ## 车机验证
 
-停车后，使用车机允许的安装方式安装。依次记录：是否允许安装、是否横屏启动、界面和歌词动画是否显示、配置自己的服务后是否能够前台播放。UI 7.0 名称不能证明具体 Android API 或 WebView 版本；若不能安装或白屏，请记录车机 Android/WebView 版本及错误信息。
+停车后，使用车机允许的安装方式安装。依次记录：是否允许安装、是否横屏启动、界面和歌词动画是否显示、网易云扫码是否出现、酷狗歌单是否能前台播放、能否返回选歌页。UI 7.0 名称不能证明具体 Android API 或 WebView 版本；若不能安装或白屏，请记录车机 Android/WebView 版本及错误信息。
 
 这是 debug 签名 APK；不同 CI 构建可能使用不同调试证书。如果后续覆盖安装提示签名不一致，需先卸载旧测试版（会清除应用数据）。不用于正式商店分发。
 
@@ -51,6 +45,7 @@
 ```sh
 npm ci
 npm run cap:sync:android
+python3 mobile/prepare.py
 cd android
 bash gradlew assembleDebug
 ```
