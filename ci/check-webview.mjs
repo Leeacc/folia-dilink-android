@@ -35,7 +35,7 @@ if (!webViewMajor) throw new Error('Cannot identify WebView version');
 if (webViewMajor < 95) {
   if (!dom.text.includes('Folia') || !dom.text.includes('WebView')) throw new Error('Missing compatibility message');
 } else {
-  if (!dom.children || dom.text.trim().length < 50) throw new Error('Folia UI did not render');
+  if (!dom.children || !dom.text.includes('Folia') || !/Playlists|歌单/.test(dom.text)) throw new Error('Folia library navigation did not render');
 }
 
 if (dom.width !== dom.screenWidth || dom.height !== dom.screenHeight) throw new Error('Emulator system bars are not hidden');

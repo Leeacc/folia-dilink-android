@@ -4,9 +4,15 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      apk_run_id:
+        description: 'Optional existing build run to verify without rebuilding the APK'
+        required: false
+        type: string
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: android-${{ github.ref }}
@@ -14,6 +20,7 @@ concurrency:
 
 jobs:
   build:
+    if: ${{ !inputs.apk_run_id }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -88,6 +95,7 @@ jobs:
           retention-days: 30
 
   smoke-test:
+    if: ${{ always() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.apk_run_id != '')) }}
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -104,6 +112,8 @@ jobs:
         with:
           name: folia-dilink-test-apk
           path: artifacts
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.apk_run_id || github.run_id }}
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
