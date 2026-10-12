@@ -81,3 +81,10 @@ Android 包内置 Node.js Mobile 18.20.4 和电脑版使用的网易云、酷狗
 此版最低 Android 8 / API 26，包含 ARM64、ARMv7 和 x86_64。网络仍然需要可访问网易云/酷狗，实际账号授权必须由用户扫码确认。没有自动登录用户账户。QQ provider 尚未移植，本次接通当前界面已有的网易云和酷狗。
 
 Node.js Mobile 为官方 v18.20.4 固定发布包；依赖按 mobile/runtime/package-lock.json 安装。mobile/prepare.py 打包生产依赖，保留库许可证。相比 r2 安装包与占用空间会增大。电脑 Node 上的真实网易云/酷狗 QR key 和 PNG 生成已验证；CI 另检查 Android 原生桥和内置二维码生成，并记录真实网络 key 请求结果（远端服务不可达时不冒充成功）。
+
+## r4：车机登录、音频与返回操作
+
+- 网易云依赖的临时文件目录固定到应用私有存储，避免 Android 环境下读取不存在的 `/tmp/anonymous_token`。
+- 远程音频经过同源原生流式通道，保留 Range 请求和响应，HTTP 音乐链接尝试使用 HTTPS；不关闭整个 WebView 的安全检查。
+- Android 播放页常驻“返回选歌”按钮，不依赖鼠标悬停。
+- CI 检查 Android 内实际 QR key 请求、返回按钮点击、测试音频开始播放及跳转进度。真实账号扫码和账号歌单播放仍需要车机验证。

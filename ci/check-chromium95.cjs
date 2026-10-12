@@ -50,7 +50,8 @@ const fs = require('node:fs');
   fs.writeFileSync('artifacts/chromium95/interaction.txt', after);
   if (after === before.text || errors.length) throw new Error(`Settings did not open cleanly: ${errors.join(';')}`);
   await page.reload({waitUntil: 'domcontentloaded'});
-  await page.locator('button:has-text("Connect 网易云 Account")').click();
+  // The dialog stays in this SPA; assert its rendered state instead of waiting on unrelated navigation.
+  await page.locator('button:has-text("Connect 网易云 Account")').click({noWaitAfter: true});
   await page.waitForFunction(() => document.body.innerText.includes('No music service is connected.'));
   const dialog = page.locator('[role="dialog"]');
   if (await dialog.locator('.animate-spin').count()) throw new Error('Error dialog still shows a loading spinner');
