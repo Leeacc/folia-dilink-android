@@ -97,21 +97,25 @@ if (webViewMajor >= 95) {
       } catch (error) { checked.error = error.name; }
       finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     }
-    // Verify QQ through the same native bridge and actual login UI used on the car.
-    const search = await request('qq','/getSearchByKey?key=' + encodeURIComponent('海阔天空') + '&limit=20&page=1');
-    const songs = search.data?.body?.request?.data?.body?.song?.list;
-    if (!Array.isArray(songs) || !songs.length || !songs[0].mid) throw new Error('QQ catalog search failed');
-    const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
-    if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
-    qqButton.click();
-    let qrVisible = false;
-    for (let attempt = 0; attempt < 90; attempt++) {
-      const image = document.querySelector('[role="dialog"] img[alt="QR Code"]');
-      if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qrVisible = true; break; }
-      await delay(1000);
-    }
-    if (!qrVisible) throw new Error('QQ login QR did not render');
-    return {embeddedQr:true, network, back:true, media, qq:{search:true, qrVisible:true, authenticatedPlayback:'requires user scan'}};
+    // Record both provider refusals and bridge failures before failing the check.
+    const qq = {search:false,qrVisible:false,authenticatedPlayback:'requires user scan'};
+    try {
+      const search = await request('qq','/getSearchByKey?key=' + encodeURIComponent('海阔天空') + '&limit=20&page=1');
+      const response = search.data;
+      qq.searchResponse = {code:response?.code,diagnostic:response?.diagnostic,file:response?.file,status:response?.status,outerCode:response?.body?.code,requestCode:response?.body?.request?.code};
+      const songs = response?.body?.request?.data?.body?.song?.list;
+      qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid);
+      const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
+      if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
+      qqButton.click();
+      for (let attempt = 0; attempt < 90; attempt++) {
+        const image = document.querySelector('[role="dialog"] img[alt="QR Code"]');
+        if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qq.qrVisible = true; break; }
+        await delay(1000);
+      }
+      qq.dialogText = document.querySelector('[role="dialog"]')?.textContent?.slice(0,400);
+    } catch (error) { qq.error = error.message; }
+    return {embeddedQr:true, network, back:true, media, qq};
   })()`}}));
   const inspected = await result;
   native.close();
@@ -119,4 +123,5 @@ if (webViewMajor >= 95) {
   writeFileSync('artifacts/embedded-music.json', JSON.stringify(inspected.result.result.value, null, 2));
   if (Object.values(inspected.result.result.value.media || {}).some(value => !value.playing || !value.seek)) throw new Error('Provider audio playback/seek did not pass');
   console.log('Embedded music:', inspected.result.result.value);
+  if (!inspected.result.result.value.qq?.search || !inspected.result.result.value.qq?.qrVisible) throw new Error('QQ search/QR verification failed');
 }

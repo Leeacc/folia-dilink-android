@@ -13,7 +13,10 @@ adb shell dumpsys activity activities > artifacts/activity.txt
 adb logcat -d > artifacts/logcat.txt
 adb shell dumpsys webviewupdate > artifacts/webview-provider.txt
 adb forward tcp:9222 "localabstract:webview_devtools_remote_${app_pid}"
-node ci/check-webview.mjs
+check_status=0
+node ci/check-webview.mjs || check_status=$?
+adb logcat -d > artifacts/logcat.txt
 sleep 3
 adb exec-out screencap -p > artifacts/launch.png
+if [ "$check_status" -ne 0 ]; then exit "$check_status"; fi
 if grep -E 'FATAL EXCEPTION|Fatal signal|Uncaught SyntaxError|Uncaught TypeError' artifacts/logcat.txt; then exit 1; fi
