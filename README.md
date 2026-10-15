@@ -149,3 +149,12 @@ R8 交付：versionCode **36**，版本名 `0.6.7-dilink-r8-native`，APK 源码
 用户确认 R8 音量和方向盘控制正常，但 UI7 三分屏候选里不能选择 Folia。补充应用级整数 `BYD_SUPPORT_SPLIT_ACTIVITY=1`，保留 Android resizeableActivity 与不锁方向，并补充 MAIN/DEFAULT 入口匹配。这个标记在其他 DiLink 5.1 固件的原厂策略中有实车/固件依据；是否进入秦 L EV 当前 UI7 候选列表仍需实车确认。没有修改已验证有效的 R8 音频引擎与媒体键路径。
 
 桌面卡片暂未修复。下载目录中汽水音乐 18.3.0 的静态样本未发现 BYD 专属接入声明；用户不确定它是否与车机已安装版一致，不能据此认定两者同版本。卡片可能还受当前固件的包名准入与来源选择控制，缺少该车固件证据，未伪装汽水包名或写厂商受保护数据。详见 [R9 核查](docs/dilink-r9-split-card.md)。
+
+
+## R9 交付与核验
+
+versionCode **39**，版本名 `0.6.7-dilink-r9-split`，APK 源码 `199fd34771b109f9ea20d22116126fe4069dc7ad`。[Actions 38755492502](https://github.com/Leeacc/folia-dilink-android/actions/runs/38755492502) 构建及 API 29/35 回归全部成功，60 项单测和 3 项 QQ 协议测试通过，Chromium 95 检查通过。
+
+已同时核对编译后的二进制 Manifest 及模拟器 PackageManager：应用级 BYD_SUPPORT_SPLIT_ACTIVITY 为整数 1。API 35 的系统音量键、播放/暂停、上下曲指令、后台播放/控制、五秒隐藏、实际多窗口 412×732 无横向溢出通过；网易云播放、酷狗公开试听原生播放/跳转与 QQ 搜索/二维码检查通过。上述标准环境通过仍不能证明秦 L EV UI7 候选已经接纳 Folia，也不能证明主页卡片已经修复。
+
+APK SHA-256：`f19990a2b2ad81c5ffcb33b93e3f3b4fc0b291c8bdf0eec324b61fa17ab06d6d`。

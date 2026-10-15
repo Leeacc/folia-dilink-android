@@ -17,3 +17,14 @@ R9 补充该标记及 MAIN/DEFAULT 入口，保留 R8 的音频控制、任务�
 [BYDMate 作者的原厂 MediaController 调查](https://github.com/AndyShaman/BYDMate/blob/main/app/src/main/kotlin/com/bydmate/app/media/ClusterMusicCard.kt) 记录其他 DiLink 固件会按包名筛选部分播放器。[其元数据桥](https://github.com/AndyShaman/BYDMate/blob/main/app/src/main/kotlin/com/bydmate/app/media/ClusterMusicBridge.kt) 针对的是仪表卡片，不能当作主页卡片的通用注册接口；其中媒体 Provider 受签名权限保护。
 
 汽水作为第三方可显示，足以排除“所有第三方应用都不能显示”的说法，但不足以证明任意拥有 MediaSession 的包都可显示，也不能证明它只靠某一个 Manifest 字段。当前未取得该车 MediaController/Launcher 的准入表和实际汽水版本，因此不改包名、不伪造蓝牙源、不写 FID，不声称主页卡片修复。诊断增加精确的媒体中心/控制器/桌面/汽水版本查询，便于后续对齐实际固件。
+
+用户补充：点主页蓝牙图标后的来源列表既没有 Folia，也没有能显示卡片的汽水音乐。因此该列表不能用于判断第三方自动卡片是否受支持，不能把 Folia 未出现在此列表当作白名单拒绝的直接证据。
+
+
+## R9 交付与核验
+
+versionCode **39**，版本名 `0.6.7-dilink-r9-split`，APK 源码 `199fd34771b109f9ea20d22116126fe4069dc7ad`。[Actions 38755492502](https://github.com/Leeacc/folia-dilink-android/actions/runs/38755492502) 构建及 API 29/35 回归全部成功，60 项单测和 3 项 QQ 协议测试通过，Chromium 95 检查通过。
+
+已同时核对编译后的二进制 Manifest 及模拟器 PackageManager：应用级 BYD_SUPPORT_SPLIT_ACTIVITY 为整数 1。API 35 的系统音量键、播放/暂停、上下曲指令、后台播放/控制、五秒隐藏、实际多窗口 412×732 无横向溢出通过；网易云播放、酷狗公开试听原生播放/跳转与 QQ 搜索/二维码检查通过。上述标准环境通过仍不能证明秦 L EV UI7 候选已经接纳 Folia，也不能证明主页卡片已经修复。
+
+APK SHA-256：`f19990a2b2ad81c5ffcb33b93e3f3b4fc0b291c8bdf0eec324b61fa17ab06d6d`。
