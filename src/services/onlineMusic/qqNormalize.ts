@@ -93,7 +93,9 @@ export const normalizeQqSong = (raw: unknown): UnifiedSong => {
         ) || catalogRefMid(album, 'album');
     const albumRef = qqCatalogRef('album', albumMid);
     const mediaMid = text(
-        pick(file, 'media_mid', 'mediaMid') ?? pick(item, 'mediaMid') ?? pick(providerData, 'mediaMid'),
+        pick(file, 'media_mid', 'mediaMid') ??
+            pick(item, 'mediaMid', 'media_mid', 'strMediaMid') ??
+            pick(providerData, 'mediaMid'),
     );
 
     const durationMs = Number(item.durationMs);
@@ -107,8 +109,8 @@ export const normalizeQqSong = (raw: unknown): UnifiedSong => {
         album: {
             // albummid 优先于数字 albumid：后者只在上游一个 mid 都不给时留作显示用的键，
             // 而那种条目不会带 catalogRef，导航层也就不会把它当成可查询的专辑 id。
-            id: (albumMid || pick(album, 'id', 'albumid') || '') as MediaId,
-            name: text(pick(album, 'name', 'title', 'albumname')),
+            id: (albumMid || pick(album, 'id', 'albumid') || pick(item, 'albumid') || '') as MediaId,
+            name: text(pick(album, 'name', 'title', 'albumname') ?? pick(item, 'albumname')),
             ...(coverUrl ? { coverUrl } : {}),
             ...(albumRef ? { catalogRef: albumRef } : {}),
         },

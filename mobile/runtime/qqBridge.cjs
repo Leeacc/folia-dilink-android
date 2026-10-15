@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const http = require('node:http');
+const { searchQq } = require('./qqSearch.cjs');
 
 // Embed the desktop QQ API behind Folia's authenticated loopback bridge, without a second listener.
 let callback;
@@ -77,29 +78,5 @@ function requestQq(endpoint, stateDir, port, token) {
         request.setTimeout(65000, () => request.destroy(new Error('QQ request timed out')));
         request.on('error', reject);
     });
-}
-// The old CGI/Lite searches return empty lists or 2001. Use QQ's desktop catalog RPC.
-async function searchQq(query) {
-    const payload = {
-        comm: { ct: '19', cv: '1845' },
-        request: {
-            method: 'DoSearchForQQMusicDesktop',
-            module: 'music.search.SearchCgiService',
-            param: {
-                query: String(query.get('key') || '')
-                    .trim()
-                    .slice(0, 60),
-                search_type: 0,
-                num_per_page: Math.min(100, Math.max(1, Number(query.get('limit')) || 20)),
-                page_num: Math.max(1, Number(query.get('page')) || 1),
-            },
-        },
-    };
-    const response = await require('axios').post('https://u.y.qq.com/cgi-bin/musicu.fcg', payload, {
-        timeout: 20000,
-        responseType: 'json',
-        headers: { 'Content-Type': 'application/json', Referer: 'https://y.qq.com/', 'User-Agent': 'Mozilla/5.0' },
-    });
-    return { status: response.status, body: response.data };
 }
 module.exports = { serveQq, requestQq };

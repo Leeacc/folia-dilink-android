@@ -35,6 +35,22 @@ describe('QQ Android provider', () => {
         expect(normalizeQqSong(song)).toMatchObject({ id: 5105918, qqMid: raw.mid, durationMs: 326000 });
         expect(song.album.catalogRef).toMatchObject({ providerId: 'qq', id: raw.album.mid });
     });
+    it('retains flat CGI search album and media identifiers for authorized playback', () => {
+        const result = normalizeQqSong({
+            songid: 4835784,
+            songmid: '001yS0N33yPm1B',
+            songname: '海阔天空',
+            albummid: '002qcJuX3lO3EZ',
+            albumname: '乐与怒',
+            strMediaMid: '002MX8Ea4e5RDS',
+            interval: 324,
+        });
+        expect(result.album).toMatchObject({ name: '乐与怒', catalogRef: { id: '002qcJuX3lO3EZ' } });
+        expect(result.sourceRef).toMatchObject({
+            mediaId: '001yS0N33yPm1B',
+            providerData: { mediaMid: '002MX8Ea4e5RDS' },
+        });
+    });
     it('normalizes desktop search results through Omni identity', async () => {
         request.mockResolvedValue({ code: 0, request: { code: 0, data: { body: { song: { list: [raw] } } } } });
         const page = await qqProvider.search!.searchSongs('海阔天空', 20, 0);

@@ -104,7 +104,7 @@ if (webViewMajor >= 95) {
       const response = search.data;
       qq.searchResponse = {code:response?.code,diagnostic:response?.diagnostic,file:response?.file,status:response?.status,outerCode:response?.body?.code,requestCode:response?.body?.request?.code};
       const songs = response?.body?.request?.data?.body?.song?.list;
-      qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid);
+      qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid || songs[0].songmid);
       const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
       if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
       qqButton.click();
