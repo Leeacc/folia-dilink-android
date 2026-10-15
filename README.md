@@ -1,6 +1,6 @@
 # Folia for DiLink — 横屏测试版
 
-面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云、酷狗与 QQ 音乐服务。车机已确认 R5 的网易云/酷狗登录、搜索、播放和歌词可用，新增车机控制仍需实车复测；不是官方 Android 客户端。
+面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云、酷狗与 QQ 音乐服务。车机已确认 R5 的网易云/酷狗登录、搜索、播放和歌词可用，用户已实车确认 R8 音量和方向盘音量/切歌正常；不是官方 Android 客户端。
 
 ## 下载 APK（无需 Android Studio）
 
@@ -21,7 +21,7 @@
 
 - 不再锁定窗口方向，允许车机多窗口调整尺寸，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-r8-native`；CI versionCode 使用运行编号。
+- 版本名 `0.6.7-dilink-r9-split`；CI versionCode 使用运行编号。
 - 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 8 / API 26，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
 - 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。保留原版组件和布局，补充 Android 系统栏处理及登录失败提示；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
@@ -142,3 +142,10 @@ R8 交付：versionCode **36**，版本名 `0.6.7-dilink-r8-native`，APK 源码
 60 项单测、3 项 QQ 协议测试、类型检查、Chromium 95 页面与本机界面滑杆/手势检查通过。[同一 APK 复核 38742485876](https://github.com/Leeacc/folia-dilink-android/actions/runs/38742485876)：API 29 兼容提示页检查通过；API 35 原生网易云播放、酷狗公开试听播放/跳转、音频焦点、系统音量键、暂停/恢复、上下曲指令、后台播放与暂停/恢复、五秒隐藏及实际多窗口 412×732（无横向溢出）通过。AudioFlinger 实际音轨在 1/5/20/50/100% 分别为 −40/−26/−14/−6/0 dB，未在 5% 达到满增益；不是车机扬声器听感测量。
 
 **本次 CI 整体仍失败**：独立网页播放检查中酷狗一次取址未返回 URL，后续原生检查另次取址和播放成功；QQ 扫码二维码通过，但搜索返回远端 2001。没有把这些失败改成跳过或通过，也未宣称所有在线服务均正常。DiLink 100 原厂卡片、方向盘实际路由、专用分屏入口仍需实车反馈；原生 FFT 尚未接入。
+
+
+## r9：原厂分屏候选声明
+
+用户确认 R8 音量和方向盘控制正常，但 UI7 三分屏候选里不能选择 Folia。补充应用级整数 `BYD_SUPPORT_SPLIT_ACTIVITY=1`，保留 Android resizeableActivity 与不锁方向，并补充 MAIN/DEFAULT 入口匹配。这个标记在其他 DiLink 5.1 固件的原厂策略中有实车/固件依据；是否进入秦 L EV 当前 UI7 候选列表仍需实车确认。没有修改已验证有效的 R8 音频引擎与媒体键路径。
+
+桌面卡片暂未修复。下载目录中汽水音乐 18.3.0 的静态样本未发现 BYD 专属接入声明；用户不确定它是否与车机已安装版一致，不能据此认定两者同版本。卡片可能还受当前固件的包名准入与来源选择控制，缺少该车固件证据，未伪装汽水包名或写厂商受保护数据。详见 [R9 核查](docs/dilink-r9-split-card.md)。

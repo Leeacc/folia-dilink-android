@@ -29,7 +29,7 @@ android {
         minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode Integer.parseInt(System.getenv('FOLIA_ANDROID_VERSION_CODE') ?: '1')
-        versionName "${packageJson.version}-dilink-r8-native"
+        versionName "${packageJson.version}-dilink-r9-split"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

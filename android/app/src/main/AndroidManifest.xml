@@ -11,6 +11,8 @@
         android:usesCleartextTraffic="false"
         android:networkSecurityConfig="@xml/network_security_config"
         android:theme="@style/AppTheme">
+        <!-- BYD's package-level split eligibility marker, in addition to Android resizeability. -->
+        <meta-data android:name="BYD_SUPPORT_SPLIT_ACTIVITY" android:value="1" />
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
             android:name=".MainActivity"
@@ -23,6 +25,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
@@ -42,6 +45,9 @@
     </application>
     <queries>
         <package android:name="com.byd.mediacenter" />
+        <package android:name="com.byd.mediacontroller" />
+        <package android:name="com.android.launcher3" />
+        <package android:name="com.luna.music" />
         <provider android:authorities="com.byd.mediacenter.provider" />
     </queries>
 

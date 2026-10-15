@@ -15,6 +15,17 @@ final class DiLinkCapabilities {
     }
     static JSObject inspect(Context context) {
         JSObject result = new JSObject().put("byd", isByd(context));
+        try {
+            ApplicationInfo own = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
+            result.put("splitManifestValue", own.metaData == null ? 0 : own.metaData.getInt("BYD_SUPPORT_SPLIT_ACTIVITY", 0));
+        } catch (PackageManager.NameNotFoundException ignored) { result.put("splitManifestValue", "unavailable"); }
+        // Exact package queries only; compare the installed firmware/reference versions without loading their code.
+        JSObject packages = new JSObject();
+        for (String pkg : new String[]{"com.byd.mediacenter", "com.byd.mediacontroller", "com.android.launcher3", "com.luna.music"}) {
+            try { packages.put(pkg, context.getPackageManager().getPackageInfo(pkg, 0).versionName); }
+            catch (PackageManager.NameNotFoundException ignored) { packages.put(pkg, "not_visible_or_absent"); }
+        }
+        result.put("referencePackages", packages);
         String name = "android.hardware.bydauto.multimedia.BYDAutoMultimediaDevice";
         try {
             Class<?> type = Class.forName(name);
