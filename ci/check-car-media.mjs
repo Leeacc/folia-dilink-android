@@ -99,8 +99,9 @@ try {
         // Exercise the actual native engine with the same public KuGou preview used by the transport regression.
         report.nativeKugou=await evaluate(`(async()=>{
             const native=(method,input={})=>window.Capacitor.nativePromise('NativeAudio',method,input);
-            let source;
-            for(let attempt=0;attempt<3;attempt++){
+            const previous=JSON.parse(sessionStorage.getItem('ci-public-kugou-preview')||'null');
+            let source=previous&&Date.now()-previous.at<600000?previous.source:null;
+            for(let attempt=0;!source&&attempt<3;attempt++){
                 const result=await window.Capacitor.nativePromise('EmbeddedMusic','request',{provider:'kugou',endpoint:'/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1'});
                 const body=result.data?.body??result.data, urls=body?.data?.url??body?.url;
                 source=(Array.isArray(urls)?urls:[urls]).find(value=>typeof value==='string'&&/^https?:/.test(value));

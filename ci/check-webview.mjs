@@ -93,6 +93,7 @@ if (webViewMajor >= 95) {
           await delay(1500);
         }
         if (!source) { checked.code = body?.code ?? body?.status; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
+        if (provider === 'kugou') sessionStorage.setItem('ci-public-kugou-preview', JSON.stringify({source,at:Date.now()}));
         checked.scheme = new URL(source).protocol;
         audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);
         await Promise.race([audio.play(), delay(25000).then(() => {throw new Error('Media timeout');})]);
