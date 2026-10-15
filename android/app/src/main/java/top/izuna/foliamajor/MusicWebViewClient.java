@@ -23,8 +23,8 @@ public final class MusicWebViewClient extends BridgeWebViewClient {
             for (int redirects = 0; redirects < 6; redirects++) {
                 if (!Arrays.asList("http", "https").contains(target.getProtocol()) || target.getUserInfo() != null)
                     throw new IOException("Invalid media protocol");
-                // Music CDN links may be returned as HTTP; preserve the path/query and use TLS.
-                if ("http".equals(target.getProtocol())) target = new URL("https", target.getHost(), target.getPort(), target.getFile());
+                // Preserve signed CDN URLs: some KuGou hosts only serve audio over HTTP.
+                // Android permits cleartext only for the explicitly listed music domains.
                 HttpURLConnection connection = (HttpURLConnection) target.openConnection();
                 connection.setConnectTimeout(12000);
                 connection.setReadTimeout(20000);

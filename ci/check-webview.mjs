@@ -44,7 +44,7 @@ if (webViewMajor >= 95) {
   const native = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { native.addEventListener('open', resolve, {once:true}); native.addEventListener('error', reject, {once:true}); });
   const result = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Embedded runtime check timed out')), 120000);
+    const timer = setTimeout(() => reject(new Error('Embedded runtime check timed out')), 240000);
     native.addEventListener('message', event => {
       const data = JSON.parse(event.data);
       if (data.id === 2) { clearTimeout(timer); resolve(data); }
@@ -71,26 +71,38 @@ if (webViewMajor >= 95) {
     back.click();
     await delay(1000);
     if (document.querySelector('button[aria-label="返回选歌"]')) throw new Error('Back action did not leave player');
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.muted = true;
-    audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent('https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3');
     const media = {};
-    try {
-      await Promise.race([audio.play(), delay(25000).then(() => {throw new Error('Media timeout');})]);
-      await delay(1000);
-      media.playing = audio.currentTime > 0;
-      audio.currentTime = 5;
-      await delay(1500);
-      media.seek = audio.currentTime >= 5;
-    } catch (error) { media.error = error.name; }
-    finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
+    // Exercise authorized provider streams, including a KuGou public preview, rather than a generic MP3.
+    for (const provider of ['netease','kugou']) {
+      const checked = media[provider] = {};
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      audio.muted = true;
+      try {
+        const result = await request(provider, provider === 'netease'
+          ? '/song/url/v1?id=347230&level=standard'
+          : '/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1');
+        const body = result.data?.body ?? result.data;
+        const candidates = provider === 'netease' ? body?.data?.[0]?.url : (body?.data?.url ?? body?.url);
+        const source = (Array.isArray(candidates) ? candidates : [candidates]).find(value => typeof value === 'string' && /^https?:/.test(value));
+        if (!source) { checked.code = body?.code ?? body?.status; throw new Error('No provider stream'); }
+        checked.scheme = new URL(source).protocol;
+        audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);
+        await Promise.race([audio.play(), delay(25000).then(() => {throw new Error('Media timeout');})]);
+        await delay(1000);
+        checked.playing = audio.currentTime > 0;
+        audio.currentTime = 5;
+        await delay(1500);
+        checked.seek = audio.currentTime >= 5;
+      } catch (error) { checked.error = error.name; }
+      finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
+    }
     return {embeddedQr:true, network, back:true, media};
   })()`}}));
   const inspected = await result;
   native.close();
   if (inspected.result?.exceptionDetails) throw new Error(JSON.stringify(inspected.result.exceptionDetails));
   writeFileSync('artifacts/embedded-music.json', JSON.stringify(inspected.result.result.value, null, 2));
-  if (!inspected.result.result.value.media?.playing || !inspected.result.result.value.media?.seek) throw new Error('Native audio playback/seek did not pass');
+  if (Object.values(inspected.result.result.value.media || {}).some(value => !value.playing || !value.seek)) throw new Error('Provider audio playback/seek did not pass');
   console.log('Embedded music:', inspected.result.result.value);
 }

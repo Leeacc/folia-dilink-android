@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+const runtime = vi.hoisted(() => ({android:false}));
+vi.mock('@/platform/runtime', () => ({isCapacitorAndroid:()=>runtime.android}));
 import { neteaseApi } from '@/services/netease';
 import { neteaseProvider } from '@/services/onlineMusic/neteaseProvider';
 import type { UnifiedSong } from '@/types';
@@ -36,7 +38,18 @@ const song: UnifiedSong = {
 };
 
 describe('neteaseProvider', () => {
-    beforeEach(() => vi.clearAllMocks());
+    beforeEach(() => {vi.clearAllMocks(); runtime.android=false;});
+
+    it('reports a failed audio API request as an error', async () => {
+        vi.mocked(neteaseApi.getSongUrl).mockResolvedValue({code:502,diagnostic:'Error'} as any);
+        await expect(neteaseProvider.playback!.getAudioSource(song, 'standard')).rejects.toThrow('NetEase audio request failed');
+    });
+
+    it('preserves the authorized stream URL on Android', async () => {
+        runtime.android=true;
+        vi.mocked(neteaseApi.getSongUrl).mockResolvedValue({code:200,data:[{url:'http://m10.music.126.net/song.mp3'}]} as any);
+        await expect(neteaseProvider.playback!.getAudioSource(song, 'standard')).resolves.toMatchObject({url:'http://m10.music.126.net/song.mp3'});
+    });
 
     it('maps semantic high quality to the NetEase exhigh value', async () => {
         vi.mocked(neteaseApi.getSongUrl).mockResolvedValue({ data: [{ url: 'http://music.test/song.mp3' }] } as any);

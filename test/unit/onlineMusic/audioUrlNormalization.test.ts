@@ -1,9 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+const runtime = vi.hoisted(() => ({android:false}));
+vi.mock('@/platform/runtime', () => ({isCapacitorAndroid:()=>runtime.android}));
 import { toSafeRemoteUrl } from '@/utils/appPlaybackHelpers';
 
 // test/unit/onlineMusic/audioUrlNormalization.test.ts
 
 describe('online audio URL normalization', () => {
+    it('preserves HTTP-only signed music CDN links on Android', () => {
+        runtime.android = true;
+        expect(toSafeRemoteUrl('http://fs.youthandroid2.kugou.com/song.mp3?key=sample')).toBe('http://fs.youthandroid2.kugou.com/song.mp3?key=sample');
+        runtime.android = false;
+    });
     it('upgrades KuGou fs CDN URLs to HTTPS', () => {
         expect(toSafeRemoteUrl('http://fs.youthandroid2.kugou.com/path/song.mp3'))
             .toBe('https://fs.youthandroid2.kugou.com/path/song.mp3');

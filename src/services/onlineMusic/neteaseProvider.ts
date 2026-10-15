@@ -1,3 +1,4 @@
+import { isCapacitorAndroid } from '../../platform/runtime';
 import type { SongResult, UnifiedSong } from '../../types';
 import type {
     AudioQualityPreference,
@@ -261,10 +262,13 @@ export const neteaseProvider: OnlineMusicProvider = {
         },
         async getAudioSource(song, quality) {
             const response = await neteaseApi.getSongUrl(toNeteaseId(song.id), mapQuality(quality));
+            if (response?.diagnostic || (response?.code && Number(response.code) !== 200)) {
+                throw new Error(`NetEase audio request failed (${response?.diagnostic || response.code})`);
+            }
             const rawUrl = response?.data?.[0]?.url;
             if (!rawUrl) return null;
             return {
-                url: String(rawUrl).replace(/^http:/, 'https:'),
+                url: isCapacitorAndroid() ? String(rawUrl) : String(rawUrl).replace(/^http:/, 'https:'),
                 fetchedAt: Date.now(),
                 quality,
             };

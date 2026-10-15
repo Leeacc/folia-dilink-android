@@ -38,7 +38,7 @@ export async function loadOnlineSongAudioSource(
         source = await omni.getAudioSource(song, audioQuality);
     } catch (error) {
         console.warn('[OnlinePlayback] Provider audio source is temporarily unavailable', error);
-        return { kind: 'unavailable' };
+        throw error;
     }
     const url = toSafeRemoteUrl(source?.url);
     if (!url) {

@@ -50,6 +50,9 @@ async function dispatch(provider, endpoint) {
   if (!fs.existsSync(file)) throw new Error('Unknown music operation');
   params.cookie = ncmUtil.cookieToJson(params.cookie || '');
   params.timeout = 12000;
+  // Embedded startup does not provision xeapi_public_key; the supported eapi route
+  // returns the same authorized stream without that desktop bootstrap dependency.
+  if (operation === 'song_url_v1') params.crypto = 'eapi';
   const result = await require(file)(params, (...args) => require(path.join(ncmRoot, 'util/request'))(...args));
   const body = result.body ?? result;
   if (Array.isArray(result.cookie) && result.cookie.length && !body.cookie) body.cookie = result.cookie.join(';');

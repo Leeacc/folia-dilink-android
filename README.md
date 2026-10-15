@@ -21,7 +21,7 @@
 
 - 主 Activity 固定为 landscape，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-embedded-r4`；CI versionCode 使用运行编号。
+- 版本名 `0.6.7-dilink-embedded-r5`；CI versionCode 使用运行编号。
 - 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 8 / API 26，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
 - 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。保留原版组件和布局，补充 Android 系统栏处理及登录失败提示；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
@@ -83,3 +83,12 @@ Node.js Mobile 为官方 v18.20.4 固定发布包；依赖按 mobile/runtime/pac
 - 远程音频经过同源原生流式通道，保留 Range 请求和响应，HTTP 音乐链接尝试使用 HTTPS；不关闭整个 WebView 的安全检查。
 - Android 播放页常驻“返回选歌”按钮，不依赖鼠标悬停。
 - CI 检查 Android 内实际 QR key 请求、返回按钮点击、测试音频开始播放及跳转进度。真实账号扫码和账号歌单播放仍需要车机验证。
+
+## r5：真实音乐流播放与控件居中
+
+- 网易云 `/song/url/v1` 在包内使用库支持的 eapi 协议，修复未初始化 xeapi 公钥导致取不到音频地址的问题；不启用解锁或绕过会员权限。
+- Android 保留平台返回的原始音乐链接。酷狗公开试听链接实测 HTTP 返回音频，强制 HTTPS 会连接失败；原生通道现在仅对明确列出的音乐域名允许 HTTP。
+- 播放地址接口出错不再被吞掉并当作“已下架”；取不到地址的提示改为“暂未取得播放地址”。
+- 播放控件采用左右边界与自动外边距居中，避免动画变换覆盖 CSS 平移后偏到右下角。
+- CI 使用网易云 API 返回的实际音频及酷狗公开试听流检查播放、进度跳转。酷狗试听只用于验证音频传输，不代表用户账号的完整歌曲授权。
+- 本轮模拟器检查 API 29 与 35；API 31 曾连续启动超时，车机 Android 12 本轮仍需实际验证。

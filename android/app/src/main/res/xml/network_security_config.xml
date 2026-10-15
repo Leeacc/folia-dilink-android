@@ -3,5 +3,9 @@
   <base-config cleartextTrafficPermitted="false" />
   <domain-config cleartextTrafficPermitted="true">
     <domain>127.0.0.1</domain>
+    <domain includeSubdomains="true">kugou.com</domain>
+    <domain includeSubdomains="true">kugou.net</domain>
+    <domain includeSubdomains="true">music.126.net</domain>
+    <domain includeSubdomains="true">music.163.com</domain>
   </domain-config>
 </network-security-config>

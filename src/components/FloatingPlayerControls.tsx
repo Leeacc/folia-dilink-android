@@ -141,7 +141,8 @@ const FloatingPlayerControls: React.FC<FloatingPlayerControlsProps> = ({
     return (
         <>
             <motion.div
-                className={`absolute bottom-8 left-1/2 -translate-x-1/2 z-60 w-full flex justify-center transition-all duration-300 pointer-events-none
+                data-testid="floating-player-controls"
+                className={`absolute bottom-8 inset-x-0 mx-auto z-60 w-full flex justify-center transition-all duration-300 pointer-events-none
                     ${currentView === 'home' ? 'max-w-[calc(100vw-120px)] md:max-w-lg' : 'max-w-lg px-4'}`}
                 initial={false}
                 animate={{

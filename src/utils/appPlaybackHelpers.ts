@@ -1,3 +1,4 @@
+import { isCapacitorAndroid } from '../platform/runtime';
 import i18n from '../i18n/config';
 import type { LyricData, ReplayGainMode, SongResult } from '../types';
 import type { StructuredLyric } from '../types/navidrome';
@@ -70,6 +71,9 @@ export const toSafeRemoteUrl = (url: string | null | undefined): string | null |
     }
 
     const normalizedUrl = url.split(/,\s*(?=https?:\/\/)/i)[0]?.trim() || url;
+
+    // The Android native stream handler supports the CDN's original HTTP scheme.
+    if (isCapacitorAndroid()) return normalizedUrl;
 
     if (normalizedUrl.startsWith('http:') && normalizedUrl.includes('music.126.net')) {
         return normalizedUrl.replace('http:', 'https:');
