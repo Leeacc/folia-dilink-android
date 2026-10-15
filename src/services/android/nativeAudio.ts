@@ -27,9 +27,11 @@ export function attachNativeAudio(element: HTMLAudioElement) {
     let disposed = false, generation = 0, source = '', sourceId = '', volume = 0.2, muted = false;
     let position = 0, duration = NaN, paused = true, ended = false, prepared = false, stamp = performance.now();
     let pendingSeek: number | null = null;
+    let errorSent = false;
     let loading: Promise<unknown> = Promise.resolve();
     const saved = new Map<string, PropertyDescriptor | undefined>();
     const emit = (event: string) => element.dispatchEvent(new Event(event));
+    const fail = () => { if (!errorSent) { errorSent = true; emit('error'); } };
     const apply = (state: NativeAudioState) => {
         if (disposed || state.sourceId !== sourceId) return;
         const wasPaused = paused, wasPrepared = prepared;
@@ -43,7 +45,7 @@ export function attachNativeAudio(element: HTMLAudioElement) {
         if (!wasPaused && paused && !ended) emit('pause');
         if (state.event === 'seeked') emit('seeked');
         if (state.event === 'ended') emit('ended');
-        if (state.event === 'error') emit('error');
+        if (state.event === 'error') fail();
         emit('timeupdate');
     };
     const listener = nativeAudio.addListener('state', apply);
@@ -56,6 +58,7 @@ export function attachNativeAudio(element: HTMLAudioElement) {
     const load = (next: string | null) => {
         if (disposed || (next || '') === source) return;
         const mine = ++generation;
+        errorSent = false;
         source = next || ''; sourceId = `${Date.now()}-${++sourceSequence}`;
         position = 0; duration = NaN; prepared = false; paused = true; ended = false; stamp = performance.now();
         void nativeAudio.pause().catch(() => {});
@@ -65,12 +68,15 @@ export function attachNativeAudio(element: HTMLAudioElement) {
             await listener;
             let nativeSource = original;
             if (original.startsWith('blob:')) {
-                const data = new Uint8Array(await (await fetch(original)).arrayBuffer());
+                const blob = await (await fetch(original)).blob();
+                if (blob.size > 100 * 1024 * 1024) throw new Error('Native audio cache exceeds size limit');
                 const { token } = await nativeAudio.cacheBegin();
-                for (let offset = 0; offset < data.length; offset += 192 * 1024) {
+                for (let offset = 0; offset < blob.size; offset += 192 * 1024) {
                     if (mine !== generation || disposed) throw new DOMException('Audio replaced', 'AbortError');
-                    const bytes = data.subarray(offset, offset + 192 * 1024);
-                    const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+                    const bytes = new Uint8Array(await blob.slice(offset, offset + 192 * 1024).arrayBuffer());
+                    let binary = '';
+                    for (let part = 0; part < bytes.length; part += 8192)
+                        binary += String.fromCharCode(...bytes.subarray(part, part + 8192));
                     nativeSource = (await nativeAudio.cacheAppend({ token, data: btoa(binary) })).source;
                 }
             }
@@ -80,7 +86,7 @@ export function attachNativeAudio(element: HTMLAudioElement) {
             apply(state);
             await nativeAudio.setLoop({ loop: element.loop });
         })();
-        void loading.catch(error => { if (mine === generation && !disposed && error?.name !== 'AbortError') emit('error'); });
+        void loading.catch(error => { if (mine === generation && !disposed && error?.name !== 'AbortError') fail(); });
     };
     define('src', { get: () => source });
     define('currentSrc', { get: () => source });
@@ -97,7 +103,10 @@ export function attachNativeAudio(element: HTMLAudioElement) {
             void nativeAudio.seek({ position }).then(apply).catch(() => {});
         },
     });
-    define('volume', { get: () => volume, set: (value: number) => { volume = Math.min(1, Math.max(0, value)); sendGain(); } });
+    define('volume', { get: () => volume, set: (value: number) => {
+        if (!Number.isFinite(value)) return;
+        volume = Math.min(1, Math.max(0, value)); sendGain();
+    } });
     define('muted', { get: () => muted, set: (value: boolean) => { muted = value; sendGain(); } });
     define('play', { value: async () => {
         const mine = generation;

@@ -25,6 +25,7 @@ final class DiLinkCapabilities {
                 catch (ReflectiveOperationException error) { result.put(method, cause(error)); }
             }
         } catch (ClassNotFoundException error) { result.put("multimediaApi", "not_present"); }
+        catch (LinkageError error) { result.put("multimediaApi", error.getClass().getSimpleName()); }
         catch (Exception error) { result.put("multimediaApi", cause(error)); }
         ProviderInfo provider = context.getPackageManager().resolveContentProvider("com.byd.mediacenter.provider", 0);
         if (provider != null) {

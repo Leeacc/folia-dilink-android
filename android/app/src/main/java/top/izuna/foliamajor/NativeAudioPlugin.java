@@ -22,6 +22,12 @@ public class NativeAudioPlugin extends Plugin {
     private double gain = 0.2;
     private String sourceId = "";
     private PluginCall pendingPrepare;
+    private double lastPosition, lastDuration;
+    private final Runnable prepareTimeout = () -> {
+        if (pendingPrepare == null) return;
+        PluginCall call = pendingPrepare; pendingPrepare = null;
+        releasePlayer(); call.reject("Native audio preparation timed out", "MEDIA_TIMEOUT");
+    };
     private File blobFile;
     private long blobBytes;
     private final Runnable tick = new Runnable() { public void run() {
@@ -31,6 +37,7 @@ public class NativeAudioPlugin extends Plugin {
         instance = this;
         audio = getContext().getSystemService(AudioManager.class);
         gain = getContext().getSharedPreferences("native_audio", Context.MODE_PRIVATE).getFloat("gain", 0.2f);
+        if (!Double.isFinite(gain)) gain = 0.2;
         focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setAudioAttributes(attributes()).setOnAudioFocusChangeListener(this::onFocus, main).build();
     }
@@ -52,13 +59,14 @@ public class NativeAudioPlugin extends Plugin {
     private void applyGain() { if (player != null) { float value = (float)(gain * (ducked ? 0.2 : 1)); try { player.setVolume(value, value); } catch (IllegalStateException ignored) {} } }
     private void releasePlayer() {
         main.removeCallbacks(tick);
+        main.removeCallbacks(prepareTimeout);
         if (pendingPrepare != null) { pendingPrepare.reject("Audio source replaced", "ABORTED"); pendingPrepare = null; }
         if (player != null) { player.release(); player = null; }
         prepared = playing = ended = false;
     }
     @PluginMethod public void prepare(PluginCall call) { main.post(() -> {
         try {
-            releasePlayer(); sourceId = call.getString("sourceId", "");
+            releasePlayer(); lastPosition = lastDuration = 0; sourceId = call.getString("sourceId", "");
             String source = call.getString("source", "");
             Uri uri = Uri.parse(source);
             boolean remote = ("http".equals(uri.getScheme()) || "https".equals(uri.getScheme()))
@@ -73,6 +81,7 @@ public class NativeAudioPlugin extends Plugin {
             applyGain(); // Never start at MediaPlayer's default full per-player gain.
             next.setOnPreparedListener(value -> {
                 if (player != value) return;
+                main.removeCallbacks(prepareTimeout);
                 prepared = true; emit("loadedmetadata");
                 PluginCall pending = pendingPrepare; pendingPrepare = null;
                 if (pending != null) pending.resolve(snapshot());
@@ -84,6 +93,7 @@ public class NativeAudioPlugin extends Plugin {
             next.setOnSeekCompleteListener(value -> { if (player == value) emit("seeked"); });
             next.setOnErrorListener((value, what, extra) -> {
                 if (player != value) return true;
+                main.removeCallbacks(prepareTimeout);
                 playing = false; prepared = false; main.removeCallbacks(tick);
                 JSObject error = snapshot().put("event", "error").put("errorCode", what).put("extra", extra);
                 notifyListeners("state", error);
@@ -91,6 +101,7 @@ public class NativeAudioPlugin extends Plugin {
                 return true;
             });
             next.setDataSource(getContext(), uri); next.prepareAsync();
+            main.postDelayed(prepareTimeout, 25000);
         } catch (Exception error) {
             if (pendingPrepare == call) pendingPrepare = null;
             call.reject("原生音乐加载失败", error);
@@ -129,16 +140,16 @@ public class NativeAudioPlugin extends Plugin {
         call.resolve(snapshot());
     }); }
     @PluginMethod public void setGain(PluginCall call) { main.post(() -> {
-        gain = Math.max(0, Math.min(1, call.getDouble("value", 0.2)));
+        double requested = call.getDouble("value", 0.2);
+        gain = Double.isFinite(requested) ? Math.max(0, Math.min(1, requested)) : 0.2;
         getContext().getSharedPreferences("native_audio", Context.MODE_PRIVATE).edit().putFloat("gain", (float)gain).apply();
         applyGain(); call.resolve();
     }); }
     @PluginMethod public void setLoop(PluginCall call) { main.post(() -> { if (player != null) player.setLooping(call.getBoolean("loop", false)); call.resolve(); }); }
     @PluginMethod public void status(PluginCall call) { main.post(() -> call.resolve(snapshot())); }
     JSObject snapshot() {
-        double position = 0, duration = 0;
-        try { if (prepared && player != null) { position = player.getCurrentPosition() / 1000.0; duration = player.getDuration() / 1000.0; } } catch (IllegalStateException ignored) {}
-        return new JSObject().put("sourceId", sourceId).put("position", position).put("duration", duration)
+        try { if (prepared && player != null) { lastPosition = player.getCurrentPosition() / 1000.0; lastDuration = player.getDuration() / 1000.0; } } catch (IllegalStateException ignored) {}
+        return new JSObject().put("sourceId", sourceId).put("position", lastPosition).put("duration", lastDuration)
             .put("playing", playing).put("prepared", prepared).put("ended", ended).put("gain", gain).put("focusHeld", focusHeld)
             .put("sessionId", player == null ? 0 : player.getAudioSessionId()).put("systemMusicActive", audio.isMusicActive())
             .put("engine", "android.media.MediaPlayer").put("stream", AudioManager.STREAM_MUSIC);

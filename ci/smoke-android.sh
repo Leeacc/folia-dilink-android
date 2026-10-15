@@ -4,6 +4,8 @@ set -euo pipefail
 adb shell wm size 1080x1920
 adb shell settings put system accelerometer_rotation 0
 adb shell settings put system user_rotation 1
+adb shell wm user-rotation lock 1
+adb shell wm fixed-to-user-rotation enabled
 adb install artifacts/folia-dilink-test.apk
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb logcat -c

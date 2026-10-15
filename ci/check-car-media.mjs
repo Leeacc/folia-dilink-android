@@ -23,6 +23,24 @@ try {
     const initial=await evaluate('({ua:navigator.userAgent})');
     if(Number(initial.ua.match(/Chrome\/(\d+)/)?.[1])<95){report.skipped='Old WebView compatibility page';}
     else {
+        // Exercise the actual native engine with the same public KuGou preview used by the transport regression.
+        report.nativeKugou=await evaluate(`(async()=>{
+            const native=(method,input={})=>window.Capacitor.nativePromise('NativeAudio',method,input);
+            let source;
+            for(let attempt=0;attempt<3;attempt++){
+                const result=await window.Capacitor.nativePromise('EmbeddedMusic','request',{provider:'kugou',endpoint:'/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1'});
+                const body=result.data?.body??result.data, urls=body?.data?.url??body?.url;
+                source=(Array.isArray(urls)?urls:[urls]).find(value=>typeof value==='string'&&/^https?:/.test(value));
+                if(source)break;await new Promise(r=>setTimeout(r,1500));
+            }
+            if(!source)throw new Error('No public KuGou preview URL for native check');
+            await native('setGain',{value:.1});await native('prepare',{source,sourceId:'ci-native-kugou'});await native('play');
+            await new Promise(r=>setTimeout(r,1800));const playing=await native('status');
+            await native('seek',{position:5});await new Promise(r=>setTimeout(r,1500));const sought=await native('status');
+            await native('pause');await native('setGain',{value:.2});
+            return {playing:playing.playing&&playing.position>0,seek:sought.position>=5,scheme:new URL(source).protocol};
+        })()`);
+        if(!report.nativeKugou.playing||!report.nativeKugou.seek)throw new Error('Native KuGou playback/seek failed');
         await evaluate(`(async()=>{
             const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('KineticPlayerDB');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
             const song={id:1909126284,name:'Folia Car Integration Test',artists:[{id:1,name:'Provider test stream'}],album:{id:1,name:'CI verification'},durationMs:120000,sourceRef:{kind:'online',providerId:'netease',mediaId:'1909126284'}};
@@ -44,6 +62,15 @@ try {
             throw new Error('Actual native player/focus did not become active');
         if(native.gain>0.2001)throw new Error('Initial native gain exceeded startup guard');
         if(report.nativeDiagnostics.requestedOrientation!==-1)throw new Error('Activity still requests an orientation lock');
+        report.gainSteps=[];
+        for(const value of [.01,.05,.2,.5,1]){
+            await evaluate(`(async()=>{document.querySelector('audio').volume=${value};await new Promise(r=>setTimeout(r,400));})()`);
+            const state=await evaluate("window.Capacitor.nativePromise('NativeAudio','status',{})");
+            report.gainSteps.push({requested:value,applied:state.gain,playing:state.playing});
+            if(Math.abs(state.gain-value)>0.0001||!state.playing)throw new Error('Native volume range regression');
+            writeFileSync('artifacts/audio-mixer-'+value+'.txt',adb('shell','dumpsys','media.audio_flinger'));
+        }
+        await evaluate("document.querySelector('audio').volume=.2");
         const before=await evaluate("window.Capacitor.nativePromise('CarMedia','getVolume',{})");
         adb('shell','input','keyevent',before.index>=before.max?'25':'24');await delay(500);
         const after=await evaluate("window.Capacitor.nativePromise('CarMedia','getVolume',{})");

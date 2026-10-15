@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     listener: null as null | ((state: NativeAudioState) => void),
     state: { sourceId: '', position: 0, duration: 180, playing: false, prepared: true, ended: false, gain: 0.2, focusHeld: true } as NativeAudioState,
     remove: vi.fn(),
-    gain: vi.fn(async () => {}),
+    gain: vi.fn(async (_input: { value: number }) => {}),
 }));
 vi.mock('@capacitor/core', () => ({
     Capacitor: { isPluginAvailable: () => true },
@@ -62,6 +62,15 @@ describe('native car audio media-element boundary', () => {
         expect(mocks.gain).toHaveBeenLastCalledWith({ value: 0 });
         element.volume = 0.12; element.muted = false;
         expect(mocks.gain).toHaveBeenLastCalledWith({ value: 0.12 });
+        bridge.dispose();
+    });
+    it('preserves distinct low and high slider gains without reaching full gain at five percent', () => {
+        const element = audio(), bridge = attachNativeAudio(element);
+        const levels = [0, 0.01, 0.05, 0.2, 0.5, 1];
+        for (const value of levels) element.volume = value;
+        expect(mocks.gain.mock.calls.map(call => call[0])).toEqual(levels.map(value => ({ value })));
+        element.volume = NaN;
+        expect(mocks.gain).toHaveBeenCalledTimes(levels.length);
         bridge.dispose();
     });
     it('uses real native seek responses and completion events', async () => {
