@@ -83,7 +83,8 @@ try {
             const screenshot=await call('Page.captureScreenshot',{format:'png'});if(screenshot.result?.data)writeFileSync('artifacts/car-window.png',Buffer.from(screenshot.result.data,'base64'));
         } catch {report.multiWindow='Emulator command unavailable; browser narrow-window layout checked separately';}
         await evaluate('document.querySelector("audio").pause()');
-        await evaluate("window.Capacitor.nativePromise('CarMedia','removeListener',{eventName:'command',callbackId:window.__carCommandListener})");
+        // Capacitor removeListener returns no promise result; awaiting nativePromise would never settle.
+        await evaluate("void window.Capacitor.nativeCallback('CarMedia','removeListener',{eventName:'command',callbackId:window.__carCommandListener})");
     }
 } catch(error){report.error=error.message;process.exitCode=1;}
 finally{writeFileSync('artifacts/car-integration.json',JSON.stringify(report,null,2));console.log(report);ws.close();}
