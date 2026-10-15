@@ -15,6 +15,7 @@ adb shell dumpsys webviewupdate > artifacts/webview-provider.txt
 adb forward tcp:9222 "localabstract:webview_devtools_remote_${app_pid}"
 check_status=0
 node ci/check-webview.mjs || check_status=$?
+if [ "$check_status" -eq 0 ]; then node ci/check-car-media.mjs || check_status=$?; fi
 adb logcat -d > artifacts/logcat.txt
 sleep 3
 adb exec-out screencap -p > artifacts/launch.png
