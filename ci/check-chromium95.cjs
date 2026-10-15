@@ -51,7 +51,9 @@ const fs = require('node:fs');
   if (after === before.text || errors.length) throw new Error(`Settings did not open cleanly: ${errors.join(';')}`);
   await page.reload({waitUntil: 'domcontentloaded'});
   // The dialog stays in this SPA; assert its rendered state instead of waiting on unrelated navigation.
-  await page.locator('button:has-text("Connect 网易云 Account")').click({noWaitAfter: true});
+  // The old Playwright scroll-into-view path can stall on Chromium 95 after a reload.
+  // Visibility and ordinary pointer interactions are covered above; inspect the login handler directly here.
+  await page.locator('button:has-text("Connect 网易云 Account")').evaluate(button => button.click());
   await page.waitForFunction(() => document.body.innerText.includes('No music service is connected.'));
   const dialog = page.locator('[role="dialog"]');
   if (await dialog.locator('.animate-spin').count()) throw new Error('Error dialog still shows a loading spinner');
