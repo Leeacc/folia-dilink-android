@@ -50,6 +50,7 @@ import { isNavidromeEnabled } from './services/navidromeService';
 import { useAppNavigation } from './hooks/useAppNavigation';
 import { useNeteaseLibrary } from './hooks/useNeteaseLibrary';
 import { useKugouLibrary } from './hooks/useKugouLibrary';
+import { useQqLibrary } from './hooks/useQqLibrary';
 import { useOnlineProviderPlatform } from './hooks/useOnlineProviderPlatform';
 import { useAppPreferences } from './hooks/useAppPreferences';
 import { useElectronPlaybackBridge } from './hooks/useElectronPlaybackBridge';
@@ -844,15 +845,18 @@ export default function App() {
         logout: logoutKugouLibrary,
         checkLoginStatus: checkKugouLoginStatus,
     } = useKugouLibrary();
+    const {refresh:refreshQqLibrary,logout:logoutQqLibrary,checkLoginStatus:checkQqLoginStatus} = useQqLibrary();
     const [isProviderSyncing, setIsProviderSyncing] = useState(false);
     const onlineProviderRefreshers = useMemo(() => ({
         netease: refreshUserData,
         kugou: refreshKugouLibrary,
-    }), [refreshKugouLibrary, refreshUserData]);
+        qq: refreshQqLibrary,
+    }), [refreshKugouLibrary, refreshQqLibrary, refreshUserData]);
     const onlineProviderLogouts = useMemo(() => ({
         netease: handleLogout,
         kugou: logoutKugouLibrary,
-    }), [handleLogout, logoutKugouLibrary]);
+        qq: logoutQqLibrary,
+    }), [handleLogout, logoutKugouLibrary, logoutQqLibrary]);
     const [providerSwitchPending, setProviderSwitchPending] = useState<{
         nextProviderId: OnlineProviderId;
         resolve: (confirmed: boolean) => void;
@@ -966,15 +970,15 @@ export default function App() {
                 name: error instanceof Error ? error.name : 'Error',
             });
             const account = useOnlineProviderAccountStore.getState().accounts[providerId];
-            if (providerId !== 'kugou' || !account?.user) return;
+            if ((providerId !== 'kugou' && providerId !== 'qq') || !account?.user) return;
 
-            const user = await checkKugouLoginStatus();
-            const refreshedAccount = useOnlineProviderAccountStore.getState().accounts.kugou;
+            const user = await (providerId === 'qq' ? checkQqLoginStatus() : checkKugouLoginStatus());
+            const refreshedAccount = useOnlineProviderAccountStore.getState().accounts[providerId];
             if (!user && refreshedAccount?.error === 'auth-required') {
                 setStatusMsg({ type: 'error', text: t('status.loginExpired') });
             }
         });
-    }, [checkKugouLoginStatus, currentView, hasCollection, onlineProviderPlatform.activeProvider?.freshness, onlineProviderPlatform.activeProviderId, refreshActiveProviderPlaylists, setStatusMsg, t]);
+    }, [checkKugouLoginStatus, checkQqLoginStatus, currentView, hasCollection, onlineProviderPlatform.activeProvider?.freshness, onlineProviderPlatform.activeProviderId, refreshActiveProviderPlaylists, setStatusMsg, t]);
 
     const {
         stageStatus,

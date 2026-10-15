@@ -17,7 +17,7 @@ public class EmbeddedMusicPlugin extends Plugin {
     @PluginMethod public void request(PluginCall call) {
         String provider = call.getString("provider", "");
         String endpoint = call.getString("endpoint", "");
-        if ((!provider.equals("netease") && !provider.equals("kugou")) || !endpoint.startsWith("/") || endpoint.startsWith("//")) {
+        if ((!provider.equals("netease") && !provider.equals("kugou") && !provider.equals("qq")) || !endpoint.startsWith("/") || endpoint.startsWith("//")) {
             call.reject("Invalid music request"); return;
         }
         requests.execute(() -> {

@@ -382,6 +382,8 @@ export default {
     "yourPlaylists": "Playlist Anda",
     "searchPlaceholder": "Cari musik...",
     "songs": "lagu",
+    "loginTitleQq": "Sign in to QQ Music",
+    "loginNoteQq": "Scan and confirm with the QQ Music app",
     "loginTitle": "Pindai dengan Aplikasi Netease",
     "loginNote": "Buka Aplikasi Netease Music > Jelajahi > Pindai QR",
     "loginTitleKugou": "Pindai dengan KuGou Music",

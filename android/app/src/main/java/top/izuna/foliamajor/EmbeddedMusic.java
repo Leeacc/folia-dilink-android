@@ -70,7 +70,7 @@ public final class EmbeddedMusic {
         HttpURLConnection connection = (HttpURLConnection) new URL("http://127.0.0.1:" + port + path).openConnection();
         try {
             connection.setConnectTimeout(5000);
-            connection.setReadTimeout(20000);
+            connection.setReadTimeout(90000);
             connection.setRequestProperty("X-Folia-Token", token);
             if (request != null) {
                 connection.setRequestMethod("POST");

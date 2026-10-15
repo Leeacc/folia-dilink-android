@@ -175,7 +175,12 @@ export const omni = {
         const auth = provider.auth;
         if (!auth?.getQrKey || !auth.createQr) return unsupported(providerId, 'qr-login');
         const key = await auth.getQrKey();
-        return { key, imageUrl: await auth.createQr(key) };
+        try { return { key, imageUrl: await auth.createQr(key) }; }
+        catch(error) { await auth.cancelQr?.(key).catch(()=>{}); throw error; }
+    },
+
+    async cancelQrLogin(providerId: OmniProviderId, key: string): Promise<void> {
+        await requireOnlineMusicProvider(providerId).auth?.cancelQr?.(key);
     },
 
     async checkQrLogin(providerId: OmniProviderId, key: string): Promise<QrLoginState> {

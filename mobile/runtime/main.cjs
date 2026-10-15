@@ -1,6 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
+const { serveQq, requestQq } = require('./qqBridge.cjs');
 const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
 
 // Embedded desktop music adapters. Only the private native bridge can access this loopback endpoint.
@@ -13,6 +14,7 @@ process.env.TMPDIR = stateDir;
 require('node:os').tmpdir = () => stateDir;
 process.env.platform = 'lite';
 fs.mkdirSync(stateDir, { recursive: true });
+process.chdir(stateDir);
 const tokenPath = path.join(stateDir, 'anonymous_token');
 if (!fs.existsSync(tokenPath)) fs.writeFileSync(tokenPath, '', { mode: 0o600 });
 const ncmRoot = path.dirname(require.resolve('@neteasecloudmusicapienhanced/api/package.json'));
@@ -38,6 +40,10 @@ const kugou = createKugouApiBridge({
 });
 
 async function dispatch(provider, endpoint) {
+  if (provider === 'qq') {
+    if (!/^\/(login\/|logout(?:\?|$)|user\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
+    return requestQq(endpoint, stateDir, server.address().port, secret);
+  }
   const url = new URL(endpoint, 'http://localhost');
   const operation = url.pathname.slice(1).replace(/\//g, '_');
   if (!/^[a-zA-Z0-9_]+$/.test(operation)) throw new Error('Invalid operation');
@@ -62,7 +68,11 @@ async function dispatch(provider, endpoint) {
 const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
   if (req.headers['x-folia-token'] !== secret) { res.writeHead(403); res.end('{}'); return; }
-  if (req.url === '/health') { res.end(JSON.stringify({ ready: true, node: process.version, providers: ['netease', 'kugou'] })); return; }
+  if (req.url.startsWith('/qq/')) {
+    try { return serveQq(req, res, stateDir); }
+    catch { res.writeHead(503); res.end(JSON.stringify({code:503,message:'QQ music runtime unavailable'})); return; }
+  }
+  if (req.url === '/health') { res.end(JSON.stringify({ ready: true, node: process.version, providers: ['netease', 'kugou', 'qq'] })); return; }
   if (req.method !== 'POST' || req.url !== '/request') { res.writeHead(404); res.end('{}'); return; }
   try {
     let raw = '';

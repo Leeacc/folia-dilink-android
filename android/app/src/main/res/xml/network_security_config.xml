@@ -7,5 +7,6 @@
     <domain includeSubdomains="true">kugou.net</domain>
     <domain includeSubdomains="true">music.126.net</domain>
     <domain includeSubdomains="true">music.163.com</domain>
+    <domain includeSubdomains="true">qq.com</domain>
   </domain-config>
 </network-security-config>

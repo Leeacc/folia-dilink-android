@@ -221,6 +221,7 @@ export interface OnlineAuthProvider {
     getQrKey?(): Promise<string>;
     createQr?(key: string): Promise<string>;
     checkQr?(key: string): Promise<QrLoginState>;
+    cancelQr?(key: string): Promise<void>;
 }
 
 export interface OnlineLibraryProvider {

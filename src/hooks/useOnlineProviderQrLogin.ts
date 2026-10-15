@@ -36,6 +36,7 @@ export const useOnlineProviderQrLogin = ({
     const [qrState, setQrState] = useState<QrUiState>('idle');
     const qrCheckTimeoutRef = useRef<number | null>(null);
     const sessionIdRef = useRef(0);
+    const activeQrRef = useRef<{providerId:OnlineProviderId;key:string}|null>(null);
     const onConfirmedRef = useRef(onConfirmed);
     const lastLoggedQrStateRef = useRef<QrUiState>('idle');
 
@@ -45,6 +46,9 @@ export const useOnlineProviderQrLogin = ({
 
     const stopChecking = useCallback(() => {
         sessionIdRef.current += 1;
+        const active = activeQrRef.current;
+        activeQrRef.current = null;
+        if (active) void omni.cancelQrLogin?.(active.providerId,active.key).catch(()=>{});
         if (qrCheckTimeoutRef.current !== null) {
             window.clearTimeout(qrCheckTimeoutRef.current);
             qrCheckTimeoutRef.current = null;
@@ -73,7 +77,11 @@ export const useOnlineProviderQrLogin = ({
 
         try {
             const { key, imageUrl } = await withLoginTimeout(omni.createQrLogin(targetProviderId), hasEmbeddedMusic() ? 90000 : 15000);
-            if (sessionId !== sessionIdRef.current) return;
+            if (sessionId !== sessionIdRef.current) {
+                void omni.cancelQrLogin?.(targetProviderId,key).catch(()=>{});
+                return;
+            }
+            activeQrRef.current = {providerId:targetProviderId,key};
             setQrCodeImg(imageUrl);
             setQrState('waiting');
             lastLoggedQrStateRef.current = 'waiting';
@@ -90,6 +98,7 @@ export const useOnlineProviderQrLogin = ({
                         console.info('[ProviderQrLogin] state', { providerId: targetProviderId, state: result.state });
                     }
                     if (result.state === 'confirmed') {
+                        activeQrRef.current = null;
                         if (qrCheckTimeoutRef.current !== null) {
                             window.clearTimeout(qrCheckTimeoutRef.current);
                             qrCheckTimeoutRef.current = null;

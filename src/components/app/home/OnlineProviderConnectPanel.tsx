@@ -15,6 +15,7 @@ type OnlineProviderConnectPanelProps = {
 
 const providerBadge = (provider: ProviderAccountSummary): { label: string; className: string } => {
     if (provider.providerId === 'netease') return { label: '云', className: 'bg-red-600' };
+    if (provider.providerId === 'qq') return { label: 'Q', className: 'bg-green-600' };
     if (provider.providerId === 'kugou') return { label: 'K', className: 'bg-blue-600' };
     return { label: provider.shortName.slice(0, 1), className: 'bg-zinc-600' };
 };

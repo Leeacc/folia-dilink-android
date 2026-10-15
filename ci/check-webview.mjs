@@ -44,7 +44,7 @@ if (webViewMajor >= 95) {
   const native = new WebSocket(page.webSocketDebuggerUrl);
   await new Promise((resolve, reject) => { native.addEventListener('open', resolve, {once:true}); native.addEventListener('error', reject, {once:true}); });
   const result = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error('Embedded runtime check timed out')), 240000);
+    const timer = setTimeout(() => reject(new Error('Embedded runtime check timed out')), 360000);
     native.addEventListener('message', event => {
       const data = JSON.parse(event.data);
       if (data.id === 2) { clearTimeout(timer); resolve(data); }
@@ -97,7 +97,21 @@ if (webViewMajor >= 95) {
       } catch (error) { checked.error = error.name; }
       finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     }
-    return {embeddedQr:true, network, back:true, media};
+    // Verify QQ through the same native bridge and actual login UI used on the car.
+    const search = await request('qq','/getSearchByKey?key=' + encodeURIComponent('海阔天空') + '&limit=20&page=1');
+    const songs = search.data?.body?.request?.data?.body?.song?.list;
+    if (!Array.isArray(songs) || !songs.length || !songs[0].mid) throw new Error('QQ catalog search failed');
+    const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
+    if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
+    qqButton.click();
+    let qrVisible = false;
+    for (let attempt = 0; attempt < 90; attempt++) {
+      const image = document.querySelector('[role="dialog"] img[alt="QR Code"]');
+      if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qrVisible = true; break; }
+      await delay(1000);
+    }
+    if (!qrVisible) throw new Error('QQ login QR did not render');
+    return {embeddedQr:true, network, back:true, media, qq:{search:true, qrVisible:true, authenticatedPlayback:'requires user scan'}};
   })()`}}));
   const inspected = await result;
   native.close();

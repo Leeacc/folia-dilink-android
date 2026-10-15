@@ -1,6 +1,6 @@
 # Folia for DiLink — 横屏测试版
 
-面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云与酷狗音乐服务。车机已反馈全屏正常，登录和播放仍需逐版实测；不是官方 Android 客户端。
+面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云、酷狗与 QQ 音乐服务。车机已反馈全屏正常，登录和播放仍需逐版实测；不是官方 Android 客户端。
 
 ## 下载 APK（无需 Android Studio）
 
@@ -21,7 +21,7 @@
 
 - 主 Activity 固定为 landscape，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-embedded-r5`；CI versionCode 使用运行编号。
+- 版本名 `0.6.7-dilink-embedded-r6-qq`；CI versionCode 使用运行编号。
 - 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 8 / API 26，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
 - 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。保留原版组件和布局，补充 Android 系统栏处理及登录失败提示；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
@@ -30,7 +30,7 @@
 
 ## 功能边界与后端
 
-这是可安装的前台播放测试包。Android 已内置网易云与酷狗 API，**无需部署音乐服务器或填写服务地址**。本地音乐扫描、后台保活、锁屏播放、方向盘按键、车机媒体中心接入不在本次范围。
+这是可安装的前台播放测试包。Android 已内置网易云、酷狗与 QQ 音乐 API，**无需部署音乐服务器或填写服务地址**。本地音乐扫描、后台保活、锁屏播放、方向盘按键、车机媒体中心接入不在本次范围。
 
 网页部署仍可配置 `VITE_NETEASE_API_BASE`、`VITE_KUGOU_API_BASE`；Android 版优先调用包内服务，不依赖这些变量。AI/通用歌词代理和用户自己的 Navidrome 仍是独立可选功能，不是网易云/酷狗登录的前提。不要将 API 密钥放入公开构建变量。
 
@@ -92,3 +92,14 @@ Node.js Mobile 为官方 v18.20.4 固定发布包；依赖按 mobile/runtime/pac
 - 播放控件采用左右边界与自动外边距居中，避免动画变换覆盖 CSS 平移后偏到右下角。
 - CI 使用网易云 API 返回的实际音频及酷狗公开试听流检查播放、进度跳转。酷狗试听只用于验证音频传输，不代表用户账号的完整歌曲授权。
 - 本轮模拟器检查 API 29 与 35；API 31 曾连续启动超时，车机 Android 12 本轮仍需实际验证。
+
+
+## r6：QQ 音乐 Android 接入
+
+- QQ 音乐列入现有平台切换与账号入口；使用手机 QQ 音乐 App 扫码确认。支持账号歌单、我喜欢、歌曲搜索、专辑/歌手、歌词和授权音频链接，统一通过 Omni 调用。
+- 内置与 Folia Major 电脑版同版本的 `@yakult-green-tea/qq-music-api@3.1.4`，维持 QQ 扫码需要的 MQTT/WSS 连接，不需要外部服务器。未采用仅支持微信扫码的无中继 Serverless 入口。
+- Node 18 补充 Web Crypto 全局入口以兼容设备初始化。QQ 原始凭据和设备状态保存在应用私有目录，会话文件加密；页面仅保存不透明会话令牌。关闭/刷新二维码会释放旧扫码会话。
+- 旧 CGI 搜索返回空列表，Lite RPC 返回 2001；内置桥改用实测返回歌曲的 Desktop RPC，并保留 songmid/mediaMid，供后续取播放地址使用。
+- 已通过本机真实扫码生成/等待、搜索接口及单元测试。CI 进一步检查 Android 原生桥搜索与真实二维码显示，同时保留网易云/酷狗播放与进度跳转回归检查。最终 CI 结果以对应 Actions 运行记录为准。
+- 私人账号歌单和扫码后的 QQ 完整歌曲播放必须由用户实测；没有使用用户凭据验证，也不保证所有版权歌曲或会员音质可播。
+- CI 测试签名每次可能不同，覆盖安装提示签名冲突时，需要卸载旧测试包再安装，会清除账号和设置。

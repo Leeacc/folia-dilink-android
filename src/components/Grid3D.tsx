@@ -788,8 +788,8 @@ export const Grid3D: React.FC<Grid3DProps> = (props) => {
             <AnimatePresence>
                 {showLoginModal && (
                     <OnlineProviderLoginModal
-                        title={t(loginProviderId === 'kugou' ? 'home.loginTitleKugou' : 'home.loginTitle')}
-                        note={t(loginProviderId === 'kugou' ? 'home.loginNoteKugou' : 'home.loginNote')}
+                        title={t(loginProviderId === 'qq' ? 'home.loginTitleQq' : loginProviderId === 'kugou' ? 'home.loginTitleKugou' : 'home.loginTitle')}
+                        note={t(loginProviderId === 'qq' ? 'home.loginNoteQq' : loginProviderId === 'kugou' ? 'home.loginNoteKugou' : 'home.loginNote')}
                         qrCodeImg={qrCodeImg}
                         statusText={qrStatusText}
                         state={qrState}

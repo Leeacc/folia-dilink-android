@@ -1,1 +1,1 @@
-{"name":"folia-embedded-music","version":"1.0.0","private":true,"dependencies":{"@neteasecloudmusicapienhanced/api":"4.36.2","kugoumusicapi":"https://github.com/MakcRe/KuGouMusicApi/archive/refs/tags/v1.5.1.tar.gz"}}
+{"name":"folia-embedded-music","version":"1.0.0","private":true,"dependencies":{"@neteasecloudmusicapienhanced/api":"4.36.2","@yakult-green-tea/qq-music-api":"3.1.4","kugoumusicapi":"https://github.com/MakcRe/KuGouMusicApi/archive/refs/tags/v1.5.1.tar.gz"}}

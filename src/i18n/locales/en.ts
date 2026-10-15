@@ -409,6 +409,8 @@ export default {
     "yourPlaylists": "Your Playlists",
     "searchPlaceholder": "Search for music...",
     "songs": "songs",
+    "loginTitleQq": "Sign in to QQ Music",
+    "loginNoteQq": "Scan and confirm with the QQ Music app",
     "loginTitle": "Scan with Netease App",
     "loginNote": "Open Netease Music App > Discover > Scan QR",
     "loginTitleKugou": "Scan with KuGou Music",

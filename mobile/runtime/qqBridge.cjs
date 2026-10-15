@@ -1,0 +1,105 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const http = require('node:http');
+
+// Embed the desktop QQ API behind Folia's authenticated loopback bridge, without a second listener.
+let callback;
+function loadQq(stateDir) {
+    if (callback) return callback;
+    const keyPath = path.join(stateDir, 'qq-session-key');
+    if (!fs.existsSync(keyPath)) fs.writeFileSync(keyPath, crypto.randomBytes(32).toString('hex'), { mode: 0o600 });
+    process.env.QQ_AUTH_STATE_PATH = path.join(stateDir, 'qq-device.json');
+    process.env.QQ_AUTH_SESSION_PATH = path.join(stateDir, 'qq-sessions.sealed');
+    process.env.QQ_SESSION_SECRET = fs.readFileSync(keyPath, 'utf8').trim();
+    process.env.QQ_DISABLE_UPDATE_CHECK = 'true';
+    process.env.AUTO_OPEN_EXPLORER = 'false';
+    process.env.QQ_LOG_LEVEL = 'error';
+    // Node 18's embedded build does not expose Web Crypto globally by default.
+    if (!globalThis.crypto) globalThis.crypto = crypto.webcrypto;
+    const previous = process.env.NODE_ENV;
+    // The package's documented test switch only suppresses automatic listen/logging; real drivers stay active.
+    process.env.NODE_ENV = 'test';
+    try {
+        const api = require('@yakult-green-tea/qq-music-api');
+        if (api.server) throw new Error('QQ API unexpectedly opened a listener');
+        callback = api.default.callback();
+    } finally {
+        if (previous === undefined) delete process.env.NODE_ENV;
+        else process.env.NODE_ENV = previous;
+    }
+    return callback;
+}
+
+function serveQq(req, res, stateDir) {
+    req.url = req.url.slice(3);
+    return loadQq(stateDir)(req, res);
+}
+
+// Every request is routed through the existing private listener and token; credentials never reach a LAN port.
+function requestQq(endpoint, stateDir, port, token) {
+    loadQq(stateDir);
+    const parsed = new URL(endpoint, 'http://localhost');
+    const route = '/' + parsed.pathname.split('/')[1];
+    const allowed = new Set([
+        '/login',
+        '/logout',
+        '/user',
+        '/getMusicPlay',
+        '/getSongListDetail',
+        '/getSongInfo',
+        '/getAlbumInfo',
+        '/getSingerAlbum',
+        '/getSingerHotsong',
+        '/getSearchByKey',
+        '/getLyric',
+    ]);
+    if (!allowed.has(route)) throw new Error('Unsupported QQ route');
+    if (parsed.pathname === '/getSearchByKey') return searchQq(parsed.searchParams);
+    return new Promise((resolve, reject) => {
+        const request = http.get(
+            { hostname: '127.0.0.1', port, path: '/qq' + endpoint, headers: { 'X-Folia-Token': token } },
+            (response) => {
+                let body = '';
+                response.on('data', (chunk) => {
+                    body += chunk;
+                    if (body.length > 16000000) request.destroy(new Error('QQ response too large'));
+                });
+                response.on('end', () => {
+                    try {
+                        resolve({ status: response.statusCode, body: JSON.parse(body) });
+                    } catch {
+                        reject(new Error('Unreadable QQ response'));
+                    }
+                });
+            },
+        );
+        request.setTimeout(65000, () => request.destroy(new Error('QQ request timed out')));
+        request.on('error', reject);
+    });
+}
+// The old CGI/Lite searches return empty lists or 2001. Use QQ's desktop catalog RPC.
+async function searchQq(query) {
+    const payload = {
+        comm: { ct: '19', cv: '1845' },
+        request: {
+            method: 'DoSearchForQQMusicDesktop',
+            module: 'music.search.SearchCgiService',
+            param: {
+                query: String(query.get('key') || '')
+                    .trim()
+                    .slice(0, 60),
+                search_type: 0,
+                num_per_page: Math.min(100, Math.max(1, Number(query.get('limit')) || 20)),
+                page_num: Math.max(1, Number(query.get('page')) || 1),
+            },
+        },
+    };
+    const response = await require('axios').post('https://u.y.qq.com/cgi-bin/musicu.fcg', payload, {
+        timeout: 20000,
+        responseType: 'json',
+        headers: { 'Content-Type': 'application/json', Referer: 'https://y.qq.com/', 'User-Agent': 'Mozilla/5.0' },
+    });
+    return { status: response.status, body: response.data };
+}
+module.exports = { serveQq, requestQq };

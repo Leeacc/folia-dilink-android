@@ -23,7 +23,7 @@ const ProviderAvatar = ({ provider, className }: { provider: ProviderAccountSumm
                 aria-label={provider.displayName}
                 className={`${className} flex items-center justify-center font-black text-white ${provider.providerId === 'netease' ? 'bg-red-600' : 'bg-blue-600'}`}
             >
-                {provider.providerId === 'netease' ? '云' : provider.providerId === 'kugou' ? 'K' : <UserRound size={20} />}
+                {provider.providerId === 'netease' ? '云' : provider.providerId === 'kugou' ? 'K' : provider.providerId === 'qq' ? 'Q' : <UserRound size={20} />}
             </span>
         )
 );

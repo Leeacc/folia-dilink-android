@@ -410,6 +410,8 @@ export default {
     "yourPlaylists": "您的歌单",
     "searchPlaceholder": "搜索音乐...",
     "songs": "首",
+    "loginTitleQq": "扫码登录 QQ 音乐",
+    "loginNoteQq": "使用手机 QQ 音乐 App 扫码并确认登录",
     "loginTitle": "使用网易云APP扫码",
     "loginNote": "打开网易云音乐APP > 发现 > 扫一扫",
     "loginTitleKugou": "使用酷狗音乐APP扫码",
