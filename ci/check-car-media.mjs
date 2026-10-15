@@ -23,24 +23,6 @@ try {
     const initial=await evaluate('({ua:navigator.userAgent})');
     if(Number(initial.ua.match(/Chrome\/(\d+)/)?.[1])<95){report.skipped='Old WebView compatibility page';}
     else {
-        // Exercise the actual native engine with the same public KuGou preview used by the transport regression.
-        report.nativeKugou=await evaluate(`(async()=>{
-            const native=(method,input={})=>window.Capacitor.nativePromise('NativeAudio',method,input);
-            let source;
-            for(let attempt=0;attempt<3;attempt++){
-                const result=await window.Capacitor.nativePromise('EmbeddedMusic','request',{provider:'kugou',endpoint:'/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1'});
-                const body=result.data?.body??result.data, urls=body?.data?.url??body?.url;
-                source=(Array.isArray(urls)?urls:[urls]).find(value=>typeof value==='string'&&/^https?:/.test(value));
-                if(source)break;await new Promise(r=>setTimeout(r,1500));
-            }
-            if(!source)throw new Error('No public KuGou preview URL for native check');
-            await native('setGain',{value:.1});await native('prepare',{source,sourceId:'ci-native-kugou'});await native('play');
-            await new Promise(r=>setTimeout(r,1800));const playing=await native('status');
-            await native('seek',{position:5});await new Promise(r=>setTimeout(r,1500));const sought=await native('status');
-            await native('pause');await native('setGain',{value:.2});
-            return {playing:playing.playing&&playing.position>0,seek:sought.position>=5,scheme:new URL(source).protocol};
-        })()`);
-        if(!report.nativeKugou.playing||!report.nativeKugou.seek)throw new Error('Native KuGou playback/seek failed');
         await evaluate(`(async()=>{
             const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('KineticPlayerDB');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
             const song={id:1909126284,name:'Folia Car Integration Test',artists:[{id:1,name:'Provider test stream'}],album:{id:1,name:'CI verification'},durationMs:120000,sourceRef:{kind:'online',providerId:'netease',mediaId:'1909126284'}};
@@ -114,6 +96,24 @@ try {
             report.windowLayout=await evaluate('({width:innerWidth,height:innerHeight,overflow:document.documentElement.scrollWidth>innerWidth})');
             const screenshot=await call('Page.captureScreenshot',{format:'png'});if(screenshot.result?.data)writeFileSync('artifacts/car-window.png',Buffer.from(screenshot.result.data,'base64'));
         } catch {report.multiWindow='Emulator command unavailable; browser narrow-window layout checked separately';}
+        // Exercise the actual native engine with the same public KuGou preview used by the transport regression.
+        report.nativeKugou=await evaluate(`(async()=>{
+            const native=(method,input={})=>window.Capacitor.nativePromise('NativeAudio',method,input);
+            let source;
+            for(let attempt=0;attempt<3;attempt++){
+                const result=await window.Capacitor.nativePromise('EmbeddedMusic','request',{provider:'kugou',endpoint:'/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1'});
+                const body=result.data?.body??result.data, urls=body?.data?.url??body?.url;
+                source=(Array.isArray(urls)?urls:[urls]).find(value=>typeof value==='string'&&/^https?:/.test(value));
+                if(source)break;await new Promise(r=>setTimeout(r,1500));
+            }
+            if(!source)throw new Error('No public KuGou preview URL for native check');
+            await native('setGain',{value:.1});await native('prepare',{source,sourceId:'ci-native-kugou'});await native('play');
+            await new Promise(r=>setTimeout(r,1800));const playing=await native('status');
+            await native('seek',{position:5});await new Promise(r=>setTimeout(r,1500));const sought=await native('status');
+            await native('pause');await native('setGain',{value:.2});
+            return {playing:playing.playing&&playing.position>0,seek:sought.position>=5,scheme:new URL(source).protocol};
+        })()`);
+        if(!report.nativeKugou.playing||!report.nativeKugou.seek)throw new Error('Native KuGou playback/seek failed');
         await evaluate('document.querySelector("audio").pause()');
         // Capacitor removeListener returns no promise result; awaiting nativePromise would never settle.
         await evaluate("void window.Capacitor.nativeCallback('CarMedia','removeListener',{eventName:'command',callbackId:window.__carCommandListener})");
