@@ -80,12 +80,12 @@ if (webViewMajor >= 95) {
       audio.muted = true;
       try {
         const result = await request(provider, provider === 'netease'
-          ? '/song/url/v1?id=347230&level=standard'
+          ? '/song/url/v1?id=1909126284&level=standard'
           : '/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1');
         const body = result.data?.body ?? result.data;
         const candidates = provider === 'netease' ? body?.data?.[0]?.url : (body?.data?.url ?? body?.url);
         const source = (Array.isArray(candidates) ? candidates : [candidates]).find(value => typeof value === 'string' && /^https?:/.test(value));
-        if (!source) { checked.code = body?.code ?? body?.status; throw new Error('No provider stream'); }
+        if (!source) { checked.code = body?.code ?? body?.status; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
         checked.scheme = new URL(source).protocol;
         audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);
         await Promise.race([audio.play(), delay(25000).then(() => {throw new Error('Media timeout');})]);
