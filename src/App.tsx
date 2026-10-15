@@ -1,5 +1,7 @@
 import { isCapacitorAndroid } from './platform/runtime';
 import { androidMediaUrl } from './services/androidMedia';
+import { nativeAudioEnabled } from './services/android/nativeAudio';
+import { useNativeAudioElement } from './hooks/useNativeAudioElement';
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useMotionValue, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -484,6 +486,7 @@ export default function App() {
     }, []);
 
     const effectiveLoopMode: StageLoopMode = loopMode;
+    useNativeAudioElement(audioRef, audioSrc, effectiveLoopMode === 'one');
 
     const getTargetPlaybackVolume = useCallback(() => (isMuted ? 0 : volume), [isMuted, volume]);
 
@@ -491,6 +494,12 @@ export default function App() {
 
     const syncOutputGain = useCallback((targetVolume: number, smoothing = 0.015) => {
         const clampedVolume = clampMediaVolume(targetVolume);
+
+        if (nativeAudioEnabled() && audioRef.current) {
+            audioRef.current.volume = clampedVolume;
+            audioRef.current.muted = isMuted;
+            return;
+        }
 
         if (gainNodeRef.current && audioContextRef.current) {
             if (smoothing <= 0) {
@@ -2923,8 +2932,8 @@ export default function App() {
             }}
             audioElement={<audio
                 ref={audioRef}
-                src={androidMediaUrl(audioSrc)}
-                preload="auto"
+                src={nativeAudioEnabled() ? undefined : androidMediaUrl(audioSrc)}
+                preload={nativeAudioEnabled() ? 'none' : 'auto'}
                 crossOrigin="anonymous"
                 loop={effectiveLoopMode === 'one'}
                 onPlay={(e) => {

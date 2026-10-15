@@ -58,7 +58,13 @@ public class CarMediaPlugin extends Plugin {
             .put("multiWindow",getActivity().isInMultiWindowMode()).put("mediaSession",CarMediaService.instance != null)
             .put("commandConnected",CarMediaService.listener != null).put("commandSubscribed",hasListeners("command"))
             .put("lastCommand",CarMediaService.lastCommand);
-        call.resolve(data);
+        getActivity().runOnUiThread(() -> {
+            data.put("nativeAudio", NativeAudioPlugin.instance == null ? "unavailable" : NativeAudioPlugin.instance.snapshot())
+                .put("requestedOrientation", getActivity().getRequestedOrientation())
+                .put("legacyMedia", CarMediaService.instance == null ? "inactive" : CarMediaService.instance.legacyStatus())
+                .put("oem", DiLinkCapabilities.inspect(getContext()));
+            call.resolve(data);
+        });
     }
     @Override protected void handleOnDestroy() {
         if (CarMediaService.listener == commands) CarMediaService.listener = null;

@@ -17,8 +17,8 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(EmbeddedMusicPlugin.class);
         registerPlugin(CarMediaPlugin.class);
+        registerPlugin(NativeAudioPlugin.class);
         super.onCreate(savedInstanceState);
-        if (!isInMultiWindowMode()) setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         if (bridge != null) {
@@ -57,7 +57,6 @@ public class MainActivity extends BridgeActivity {
 
     @Override public void onMultiWindowModeChanged(boolean active, android.content.res.Configuration configuration) {
         super.onMultiWindowModeChanged(active, configuration);
-        setRequestedOrientation(active ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         enterFullscreen();
         if (bridge != null) bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript("window.dispatchEvent(new Event('resize'))", null));
     }

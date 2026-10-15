@@ -17,6 +17,7 @@ import { migratePreferredLyricSource } from '../utils/lyrics/sourcePriority';
 import { applyAppLanguagePreference, readStoredAppLanguagePreference, type AppLanguagePreference } from '../i18n/config';
 import { normalizeFontFamilyStack, normalizeFontWeight } from '../utils/fontStacks';
 import i18n from '../i18n/config';
+import { nativeAudioEnabled } from '../services/android/nativeAudio';
 import type { AudioQualityPreference } from '../types/onlineMusic';
 import {
     normalizePinnedCommandIds,
@@ -1061,6 +1062,13 @@ const readStoredVolume = () => {
 
     const saved = localStorage.getItem('player_volume');
     const parsed = saved !== null ? parseFloat(saved) : 1;
+    if (nativeAudioEnabled()) {
+        const bounded = Number.isFinite(parsed) ? Math.max(0, Math.min(1, parsed)) : 0.2;
+        const guarded = localStorage.getItem('car_volume_guard_r8') === '1' ? bounded : Math.min(0.2, bounded);
+        localStorage.setItem('car_volume_guard_r8', '1');
+        localStorage.setItem('player_volume', String(guarded));
+        return guarded;
+    }
     return Number.isFinite(parsed) ? parsed : 1;
 };
 

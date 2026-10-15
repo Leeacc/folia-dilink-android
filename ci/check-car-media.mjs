@@ -39,6 +39,11 @@ try {
         report.nativeSession=dump.includes('Folia') && dump.includes('Folia Car Integration Test');
         if(!report.nativeSession)throw new Error('Folia track metadata missing from Android MediaSession');
         report.nativeDiagnostics=await evaluate("window.Capacitor.nativePromise('CarMedia','diagnostics',{})");
+        const native=report.nativeDiagnostics.nativeAudio;
+        if(!native || native.engine!=='android.media.MediaPlayer' || !native.prepared || !native.focusHeld || !native.playing)
+            throw new Error('Actual native player/focus did not become active');
+        if(native.gain>0.2001)throw new Error('Initial native gain exceeded startup guard');
+        if(report.nativeDiagnostics.requestedOrientation!==-1)throw new Error('Activity still requests an orientation lock');
         const before=await evaluate("window.Capacitor.nativePromise('CarMedia','getVolume',{})");
         adb('shell','input','keyevent',before.index>=before.max?'25':'24');await delay(500);
         const after=await evaluate("window.Capacitor.nativePromise('CarMedia','getVolume',{})");

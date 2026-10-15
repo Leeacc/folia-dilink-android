@@ -24,6 +24,9 @@ public class CarMediaService extends MediaBrowserService {
     static String lastCommand = "";
     private MediaSession session;
     private MediaMetadata metadata;
+    private LegacyCarMedia legacy;
+    private static long lastKeyAt;
+    private static int lastKeyCode;
     private boolean playing, foreground;
     private long position;
     private String cover = "", metadataKey = "";
@@ -35,11 +38,25 @@ public class CarMediaService extends MediaBrowserService {
     static void command(String action, long position) {
         lastCommand = action;
         android.util.Log.i("FoliaCarMedia", "Transport " + action + ", connected=" + (listener != null));
+        NativeAudioPlugin.transport(action, position);
         if (listener != null) listener.onCommand(action, position);
     }
     static boolean handleKey(KeyEvent event) {
-        if (instance == null || event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0) return false;
-        switch (event.getKeyCode()) {
+        if (instance == null) return false;
+        int code = event.getKeyCode();
+        boolean byd = DiLinkCapabilities.isByd(instance);
+        if (code != KeyEvent.KEYCODE_MEDIA_PLAY && code != KeyEvent.KEYCODE_MEDIA_PAUSE
+            && code != KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE && code != KeyEvent.KEYCODE_HEADSETHOOK
+            && code != KeyEvent.KEYCODE_MEDIA_NEXT && code != KeyEvent.KEYCODE_MEDIA_PREVIOUS
+            && code != KeyEvent.KEYCODE_MEDIA_STOP && !(byd && code == 353)) return false;
+        if (event.getAction() != KeyEvent.ACTION_DOWN || event.getRepeatCount() != 0) return true;
+        long now = SystemClock.elapsedRealtime();
+        if (code == lastKeyCode && now - lastKeyAt < 160) return true;
+        lastKeyCode = code; lastKeyAt = now;
+        if (byd && (code == 353 || code == KeyEvent.KEYCODE_MEDIA_PLAY || code == KeyEvent.KEYCODE_MEDIA_PAUSE)) {
+            command(instance.playing ? "pause" : "play", 0); return true;
+        }
+        switch (code) {
             case KeyEvent.KEYCODE_MEDIA_PLAY: command("play", 0); return true;
             case KeyEvent.KEYCODE_MEDIA_PAUSE: command("pause", 0); return true;
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
@@ -56,6 +73,9 @@ public class CarMediaService extends MediaBrowserService {
         else registerReceiver(noisy,new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
         getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel(CHANNEL, "Folia 音乐播放", NotificationManager.IMPORTANCE_LOW));
         session = new MediaSession(this, "Folia");
+        ComponentName receiver = new ComponentName(this, CarMediaButtonReceiver.class);
+        if (Build.VERSION.SDK_INT >= 31) session.setMediaButtonBroadcastReceiver(receiver);
+        if (DiLinkCapabilities.isByd(this)) legacy = new LegacyCarMedia(this);
         session.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
         session.setPlaybackToLocal(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());
         session.setSessionActivity(PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
@@ -115,7 +135,8 @@ public class CarMediaService extends MediaBrowserService {
             PlaybackState.ACTION_PLAY_FROM_MEDIA_ID)
             .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED, position, playing ? 1f : 0f, SystemClock.elapsedRealtime()).build());
         session.setActive(true);
-        // WebView owns audio focus for the actual audio track. A second native focus request would steal it.
+        if (legacy != null) legacy.update(metadata, playing, position);
+        // NativeAudio owns the actual music track and the sole music audio-focus request.
         if (playing && !foreground) { startForeground(NOTIFICATION, notification()); foreground = true; }
         else if (foreground && (changed || wasPlaying != playing)) getSystemService(NotificationManager.class).notify(NOTIFICATION, notification());
         if (!Objects.equals(cover, nextCover)) { cover = nextCover; loadArtwork(nextCover); }
@@ -174,8 +195,10 @@ public class CarMediaService extends MediaBrowserService {
     }
     @Override public void onTaskRemoved(Intent rootIntent) { command("pause", 0); stopSelf(); }
     @Override public void onDestroy() {
+        if (legacy != null) legacy.close();
         if (instance == this) instance = null;
         unregisterReceiver(noisy); session.setActive(false); session.release(); artwork.shutdownNow();
         stopForeground(STOP_FOREGROUND_REMOVE); super.onDestroy();
     }
+    String legacyStatus() { return legacy == null ? "not_a_byd_device" : legacy.status; }
 }

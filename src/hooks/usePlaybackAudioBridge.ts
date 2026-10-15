@@ -8,6 +8,7 @@ import { hasCachedSongAudio } from '../services/onlineMusic/resourceCache';
 import { getSongResourceCacheKey } from '../services/onlineMusic/resourceKeys';
 import { resolveNavidromePlaybackCarrier } from '../utils/appPlaybackGuards';
 import { saveToCache } from '../services/db';
+import { nativeAudioEnabled } from '../services/android/nativeAudio';
 
 // src/hooks/usePlaybackAudioBridge.ts
 
@@ -65,6 +66,8 @@ export function usePlaybackAudioBridge({
     const replayGainLogSignatureRef = useRef<string | null>(null);
 
     const setupAudioAnalyzer = useCallback(() => {
+        // The native player owns the audible track/focus. Creating a Web Audio sink would compete with it.
+        if (nativeAudioEnabled()) return;
         if (!audioRef.current || sourceRef.current) return;
         try {
             const AudioContextClass = window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;

@@ -2,6 +2,8 @@
 # Install, capture, and inspect the actual Android WebView without external music services.
 set -euo pipefail
 adb shell wm size 1080x1920
+adb shell settings put system accelerometer_rotation 0
+adb shell settings put system user_rotation 1
 adb install artifacts/folia-dilink-test.apk
 adb shell settings put secure immersive_mode_confirmations confirmed
 adb logcat -c

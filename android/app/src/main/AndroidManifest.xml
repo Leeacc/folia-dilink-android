@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+        android:appCategory="audio"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -28,6 +29,9 @@
         <service android:name=".CarMediaService" android:exported="true" android:foregroundServiceType="mediaPlayback" android:stopWithTask="true">
             <intent-filter><action android:name="android.media.browse.MediaBrowserService" /></intent-filter>
         </service>
+        <receiver android:name=".CarMediaButtonReceiver" android:exported="true">
+            <intent-filter><action android:name="android.intent.action.MEDIA_BUTTON" /></intent-filter>
+        </receiver>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -36,6 +40,10 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
         </provider>
     </application>
+    <queries>
+        <package android:name="com.byd.mediacenter" />
+        <provider android:authorities="com.byd.mediacenter.provider" />
+    </queries>
 
     <!-- Permissions -->
 
@@ -43,4 +51,5 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 </manifest>
