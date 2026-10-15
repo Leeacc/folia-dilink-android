@@ -79,12 +79,19 @@ if (webViewMajor >= 95) {
       audio.crossOrigin = 'anonymous';
       audio.muted = true;
       try {
-        const result = await request(provider, provider === 'netease'
-          ? '/song/url/v1?id=1909126284&level=standard'
-          : '/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1');
-        const body = result.data?.body ?? result.data;
-        const candidates = provider === 'netease' ? body?.data?.[0]?.url : (body?.data?.url ?? body?.url);
-        const source = (Array.isArray(candidates) ? candidates : [candidates]).find(value => typeof value === 'string' && /^https?:/.test(value));
+        let body, source;
+        // Public preview availability is intermittent from hosted runners. Keep the real playback assertion after bounded retries.
+        for (let attempt = 0; attempt < 3; attempt++) {
+          checked.attempts = attempt + 1;
+          const result = await request(provider, provider === 'netease'
+            ? '/song/url/v1?id=1909126284&level=standard'
+            : '/song/url?hash=B04ED0F01ABBB62B9D22EC4616ED8AFE&quality=128&free_part=1');
+          body = result.data?.body ?? result.data;
+          const candidates = provider === 'netease' ? body?.data?.[0]?.url : (body?.data?.url ?? body?.url);
+          source = (Array.isArray(candidates) ? candidates : [candidates]).find(value => typeof value === 'string' && /^https?:/.test(value));
+          if (source) break;
+          await delay(1500);
+        }
         if (!source) { checked.code = body?.code ?? body?.status; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
         checked.scheme = new URL(source).protocol;
         audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);
