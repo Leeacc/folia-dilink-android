@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useAndroidMediaSession } from './useAndroidMediaSession';
 import type { RefObject } from 'react';
 import { PlayerState } from '../types';
 import type { SongResult } from '../types';
@@ -32,6 +33,7 @@ export const useMediaSessionBridge = ({
     mediaSessionNextRef,
     isNowPlayingControlDisabledRef,
 }: UseMediaSessionBridgeOptions) => {
+    useAndroidMediaSession({audioRef,currentSong,playerState,isNowPlayingStageActive,isNowPlayingControlDisabledRef,mediaSessionPlayRef,mediaSessionPauseRef,mediaSessionPrevRef,mediaSessionNextRef});
     useEffect(() => {
         if (!('mediaSession' in navigator)) {
             return;

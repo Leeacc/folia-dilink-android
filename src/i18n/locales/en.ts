@@ -1,6 +1,7 @@
 
 
 export default {
+    car:{diagnostics:'Car integration details',diagnosticsFailed:'Device details unavailable',title:'Car playback & gestures',systemHint:'Standard Android media controls; launcher support depends on the vehicle.',immersive:'Hide controls after 5 seconds while playing',horizontal:'Swipe left/right to change track',vertical:'Swipe up/down for system media volume',off:'Off',fingers:'{{count}} fingers',balanced:'Smooth graphics (30 fps, lower canvas resolution)',gestureHint:'Use empty player areas. Left: next; right: previous; up: louder. Vehicle gestures may reserve three-finger input.'},
   "notifications": {
     "coverColorAdded": "Cover color added",
     "coverColorDefault": "Using default color",
@@ -214,6 +215,9 @@ export default {
     "groupVisualizer": "Visualizer",
     "groupOther": "Command",
     "commands": {
+      "settings-car":{"title":"Car controls","description":"Choose one, two or three-finger gestures"},
+      "car-immersive":{"title":"Toggle car immersion","description":"Toggle five-second player controls"},
+      "car-graphics":{"title":"Toggle smooth car graphics","description":"Toggle device rendering budget"},
       "search-current": { "title": "Search songs", "description": "Search songs in the current source" },
       "search-local": { "title": "Search local songs", "description": "Search local library" },
       "search-navidrome": { "title": "Search Navidrome songs", "description": "Search Navidrome library" },

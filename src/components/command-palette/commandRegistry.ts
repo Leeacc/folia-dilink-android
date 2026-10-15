@@ -12,6 +12,7 @@ import type {
 import type { SearchSource } from '../../stores/useSearchNavigationStore';
 import { getProviderSongMetadata } from '../../services/onlineMusic/songMetadata';
 import { ListMusic, Pause, Play, Repeat, Search, Shuffle, SkipBack, SkipForward } from 'lucide-react';
+import { useCarSettings } from '../../stores/useCarSettings';
 import { supportsLocalMusicImport } from '../../platform/runtime';
 
 // src/components/command-palette/commandRegistry.ts
@@ -268,6 +269,9 @@ export const COMMAND_PALETTE_COMMANDS: CommandPaletteCommand[] = [
     createSettingsCommand('settings-options', 'Open Options', 'Open the options center', ['settings', 'options', '设置', '选项', 'shezhi', 'xuanxiang', 'sz', 'xx'], 'options'),
     createSettingsCommand('settings-appearance', 'Appearance settings', 'Open visual and appearance settings', ['appearance', 'visual settings', '外观', '视觉', 'waiguan', 'shijue', 'wg', 'sj'], 'options', 'appearance'),
     createSettingsCommand('settings-general', 'General settings', 'Open general app preferences', ['general', 'language settings', 'locale', '通用', '语言', 'tongyong', 'yuyan', 'ty', 'yy'], 'options', 'general'),
+    createSettingsCommand('settings-car', 'Car controls', 'Open car gestures and playback settings', ['车机','手势','方向盘','cheji','shoushi','cj','ss','car','gestures'], 'options', 'playback'),
+    {id:'car-immersive',group:'settings',title:'Toggle car immersion',description:'Toggle five-second player controls',keywords:['沉浸','chenjin','cj','immersive'],execute:()=>{const state=useCarSettings.getState();state.setPreference('immersive',!state.immersive);return true;}},
+    {id:'car-graphics',group:'settings',title:'Toggle smooth car graphics',description:'Toggle the device graphics budget',keywords:['流畅','liuchang','lc','performance','graphics'],execute:()=>{const state=useCarSettings.getState();state.setPreference('balancedGraphics',!state.balancedGraphics);return true;}},
     createSettingsCommand('settings-playback', 'Playback settings', 'Open playback behavior settings', ['playback settings', 'playback', '播放', '播放设置', 'bofang', 'bofangshezhi', 'bf', 'bfsz'], 'options', 'playback'),
     createSettingsCommand('settings-local-lyrics-priority', 'Local song lyrics priority', 'Choose whether local songs prefer local or online lyrics', ['local lyrics priority', 'online lyrics first', 'local song lyrics', '本地歌曲歌词优先级', '在线优先', '本地歌词', 'bendigeciyouxianji', 'zaixianyouxian', 'bdgcyxj', 'zxyx'], 'options', 'playback'),
     createSettingsCommand('settings-integration', 'Integration settings', 'Open Stage, Now Playing, and Navidrome settings', ['integration', 'stage', 'now playing', 'navidrome settings', '集成', '连接', 'jicheng', 'lianjie', 'jc', 'lj'], 'options', 'integration'),

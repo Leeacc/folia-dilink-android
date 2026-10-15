@@ -980,6 +980,7 @@ const UnifiedPanel: React.FC<UnifiedPanelProps> = ({
                             : { opacity: 0, x: 20, y: 12, scale: 0.92 }
                         }
                         transition={{ duration: 0.24, ease: 'easeOut' }}
+                        data-car-player-control
                         className="pointer-events-auto fixed bottom-8 right-0 z-[60] pr-4 md:pr-8 group w-20 flex justify-end"
                     >
                         {/* Wrapper for both track and button to guarantee perfect alignment across browsers */}

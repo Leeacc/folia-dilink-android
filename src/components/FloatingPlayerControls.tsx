@@ -142,6 +142,7 @@ const FloatingPlayerControls: React.FC<FloatingPlayerControlsProps> = ({
         <>
             <motion.div
                 data-testid="floating-player-controls"
+                data-car-player-control
                 className={`absolute bottom-8 inset-x-0 mx-auto z-60 w-full flex justify-center transition-all duration-300 pointer-events-none
                     ${currentView === 'home' ? 'max-w-[calc(100vw-120px)] md:max-w-lg' : 'max-w-lg px-4'}`}
                 initial={false}

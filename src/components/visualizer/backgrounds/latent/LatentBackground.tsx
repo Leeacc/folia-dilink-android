@@ -1,3 +1,4 @@
+import { useCarGraphicsBudget } from '../../../../utils/carPerformance';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { PaperShaderElement } from '@paper-design/shaders';
 import { Dithering, MeshGradient } from '@paper-design/shaders-react';
@@ -115,6 +116,7 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
     paused,
     tuning: tuningOverride,
 }) => {
+    const balancedGraphics=useCarGraphicsBudget();
     const ditheringRef = useRef<PaperShaderElement | null>(null);
     const meshRef = useRef<PaperShaderElement | null>(null);
     const ditheringLayerRef = useRef<HTMLDivElement | null>(null);
@@ -163,6 +165,7 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
         }
 
         let animationFrame = 0;
+        let lastUpdate=0, ditheringFrame=0, meshFrame=0;
         let smoothedPower = 0;
         let smoothedBass = 0;
         let smoothedMid = 0;
@@ -172,6 +175,9 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
 
         // Keep audio-rate changes inside the shader/DOM layer so React only rerenders on palette changes.
         const updateAudioResponse = () => {
+            const now=performance.now();
+            if(document.hidden || (balancedGraphics && lastUpdate && now-lastUpdate<1000/30-1)){animationFrame=requestAnimationFrame(updateAudioResponse);return;}
+            const delta=lastUpdate?Math.min(100,now-lastUpdate):0;lastUpdate=now;
             const isPaused = pausedRef.current;
             const targetPower = isPaused ? 0 : normalizeAudio(audioPower.get());
             const targetBass = isPaused ? 0 : normalizeAudio(audioBands.bass.get());
@@ -216,7 +222,7 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
             const currentDitheringMount = ditheringRef.current?.paperShaderMount;
             const currentMeshMount = meshRef.current?.paperShaderMount;
 
-            currentDitheringMount?.setSpeed(resolveLatentShaderSpeed(
+            currentDitheringMount?.setSpeed(balancedGraphics ? 0 : resolveLatentShaderSpeed(
                 tuning.ditheringSpeed,
                 tuning.ditheringAudioSpeed,
                 smoothedBeatSpeed,
@@ -225,7 +231,7 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
             currentDitheringMount?.setUniforms({
                 u_pxSize: Math.max(0.5, tuning.ditheringSize - smoothedBass * tuning.ditheringSize * 0.34),
             });
-            currentMeshMount?.setSpeed(resolveLatentShaderSpeed(
+            currentMeshMount?.setSpeed(balancedGraphics ? 0 : resolveLatentShaderSpeed(
                 tuning.meshSpeed,
                 tuning.meshAudioSpeed,
                 smoothedBeatSpeed,
@@ -236,6 +242,11 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
                 u_swirl: tuning.meshSwirl + smoothedMid * 0.38,
             });
 
+            if (balancedGraphics) {
+                ditheringFrame+=delta*resolveLatentShaderSpeed(tuning.ditheringSpeed,tuning.ditheringAudioSpeed,smoothedBeatSpeed,isPaused);
+                meshFrame+=delta*resolveLatentShaderSpeed(tuning.meshSpeed,tuning.meshAudioSpeed,smoothedBeatSpeed,isPaused);
+                currentDitheringMount?.setFrame(ditheringFrame);currentMeshMount?.setFrame(meshFrame);
+            }
             if (ditheringLayerRef.current) {
                 ditheringLayerRef.current.style.opacity = showMesh
                     ? `${Math.min(1, tuning.ditheringOpacity + smoothedBass * 0.25)}`
@@ -252,7 +263,7 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
 
         animationFrame = requestAnimationFrame(updateAudioResponse);
         return () => cancelAnimationFrame(animationFrame);
-    }, [audioBands, audioPower, showMesh, staticMode, tuning]);
+    }, [audioBands, audioPower, showMesh, staticMode, tuning, balancedGraphics]);
 
     return (
         <div
@@ -274,11 +285,11 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
                         swirl={tuning.meshSwirl}
                         grainMixer={0}
                         grainOverlay={0.01}
-                        speed={staticMode
+                        speed={staticMode || balancedGraphics
                             ? 0
                             : resolveLatentShaderSpeed(tuning.meshSpeed, tuning.meshAudioSpeed, 0, paused)}
-                        minPixelRatio={1}
-                        maxPixelCount={MAX_SHADER_PIXELS}
+                        minPixelRatio={balancedGraphics ? 0.5 : 1}
+                        maxPixelCount={balancedGraphics ? 960*540 : MAX_SHADER_PIXELS}
                         style={{ width: '100%', height: '100%' }}
                     />
                 </div>
@@ -303,11 +314,11 @@ const LatentBackground: React.FC<LatentBackgroundProps> = ({
                         shape="warp"
                         type="4x4"
                         size={tuning.ditheringSize}
-                        speed={staticMode
+                        speed={staticMode || balancedGraphics
                             ? 0
                             : resolveLatentShaderSpeed(tuning.ditheringSpeed, tuning.ditheringAudioSpeed, 0, paused)}
-                        minPixelRatio={1}
-                        maxPixelCount={MAX_SHADER_PIXELS}
+                        minPixelRatio={balancedGraphics ? 0.5 : 1}
+                        maxPixelCount={balancedGraphics ? 960*540 : MAX_SHADER_PIXELS}
                         style={{ width: '100%', height: '100%' }}
                     />
                 </div>

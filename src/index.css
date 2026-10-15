@@ -133,3 +133,8 @@ html[data-runtime='capacitor-android'] .fixed.inset-0 {
   border-color: color-mix(in srgb, var(--text-primary) 12%, transparent) !important;
   color: var(--text-primary) !important;
 }
+
+/* Car controls stay mounted for accessibility/state, but disappear during playback inactivity. */
+html[data-car-player="true"] [data-car-player-control] { transition: opacity .22s ease, visibility .22s; }
+html[data-car-idle="true"] [data-car-player-control] { opacity: 0 !important; visibility: hidden; pointer-events: none !important; }
+html[data-car-player="true"] { overscroll-behavior: none; }

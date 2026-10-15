@@ -1,6 +1,7 @@
 
 
 export default {
+    car:{diagnostics:'查看车机适配信息',diagnosticsFailed:'暂时无法读取车机信息',title:'车机播放与手势',systemHint:'方向盘与桌面音乐组件通过系统媒体会话连接；实际支持取决于车机。',immersive:'播放时 5 秒无操作隐藏按钮',horizontal:'左右滑动切歌',vertical:'上下滑动调系统媒体音量',off:'关闭',fingers:'{{count}} 指',balanced:'流畅优先（30 帧、降低画布分辨率）',gestureHint:'仅在播放全屏页面的空白区域生效；左滑下一曲、右滑上一曲，上滑增大音量。三指手势可能被车机系统占用。'},
   "notifications": {
     "coverColorAdded": "添加封面色彩",
     "coverColorDefault": "使用默认色彩",
@@ -214,6 +215,9 @@ export default {
     "groupVisualizer": "可视化",
     "groupOther": "命令",
     "commands": {
+      "settings-car":{"title":"车机手势设置","description":"设置单指、双指、三指操作"},
+      "car-immersive":{"title":"切换沉浸播放","description":"切换五秒隐藏播放按钮"},
+      "car-graphics":{"title":"切换流畅优先","description":"切换车机渲染性能预算"},
       "search-current": { "title": "搜索歌曲", "description": "在当前来源搜索歌曲" },
       "search-local": { "title": "搜索本地歌曲", "description": "搜索本地音乐库" },
       "search-navidrome": { "title": "搜索 Navidrome", "description": "搜索 Navidrome 音乐库" },

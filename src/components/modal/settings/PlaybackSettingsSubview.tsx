@@ -1,3 +1,4 @@
+import CarPlaybackSettings from '../../car/CarPlaybackSettings';
 import React, { useEffect, useState } from 'react';
 import { Monitor, PlayCircle, RefreshCw, Settings2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -182,6 +183,7 @@ const PlaybackSettingsSubview: React.FC<PlaybackSettingsSubviewProps> = ({
 
     return (
         <div className="space-y-5">
+            <CarPlaybackSettings />
             <section>
                 <h3 className="text-sm font-bold uppercase tracking-wider opacity-50 mb-4 flex items-center gap-2" style={{ color: 'var(--text-secondary)' }}>
                     <PlayCircle size={14} />                    {t('options.queueSettings')}

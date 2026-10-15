@@ -16,7 +16,10 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         registerPlugin(EmbeddedMusicPlugin.class);
+        registerPlugin(CarMediaPlugin.class);
         super.onCreate(savedInstanceState);
+        if (!isInMultiWindowMode()) setRequestedOrientation(android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         if (bridge != null) {
             bridge.getWebView().setWebViewClient(new MusicWebViewClient(bridge));
@@ -47,7 +50,24 @@ public class MainActivity extends BridgeActivity {
         if (hasFocus) enterFullscreen();
     }
 
+    @Override public boolean dispatchKeyEvent(android.view.KeyEvent event) {
+        if (CarMediaService.handleKey(event)) return true;
+        return super.dispatchKeyEvent(event);
+    }
+
+    @Override public void onMultiWindowModeChanged(boolean active, android.content.res.Configuration configuration) {
+        super.onMultiWindowModeChanged(active, configuration);
+        setRequestedOrientation(active ? android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED : android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
+        enterFullscreen();
+        if (bridge != null) bridge.getWebView().post(() -> bridge.getWebView().evaluateJavascript("window.dispatchEvent(new Event('resize'))", null));
+    }
+
     private void enterFullscreen() {
+        if (isInMultiWindowMode()) {
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).show(WindowInsetsCompat.Type.systemBars());
+            return;
+        }
         // Older Android splash/window code can restore the status bar after UI flags change.
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);

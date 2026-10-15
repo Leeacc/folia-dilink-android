@@ -1,4 +1,5 @@
 export default {
+    car:{diagnostics:'Car integration details',diagnosticsFailed:'Device details unavailable',title:'Kontrol mobil',systemHint:'Kontrol media Android; dukungan tergantung kendaraan.',immersive:'Sembunyikan kontrol setelah 5 detik',horizontal:'Geser kiri/kanan: lagu',vertical:'Geser atas/bawah: volume sistem',off:'Nonaktif',fingers:'{{count}} jari',balanced:'Grafis lancar (30 fps)',gestureHint:'Gunakan area kosong pemutar; gestur sistem mobil dapat mengambil alih tiga jari.'},
   "notifications": {
     "coverColorAdded": "Warna sampul ditambahkan",
     "coverColorDefault": "Menggunakan warna bawaan",
@@ -205,6 +206,9 @@ export default {
     "groupVisualizer": "Visualizer",
     "groupOther": "Perintah",
     "commands": {
+      "settings-car":{"title":"Car controls","description":"Choose one, two or three-finger gestures"},
+      "car-immersive":{"title":"Toggle car immersion","description":"Toggle five-second player controls"},
+      "car-graphics":{"title":"Toggle smooth car graphics","description":"Toggle device rendering budget"},
       "search-current": { "title": "Cari lagu", "description": "Cari lagu di sumber saat ini" },
       "search-local": { "title": "Cari lagu lokal", "description": "Cari di perpustakaan lokal" },
       "search-navidrome": { "title": "Cari lagu Navidrome", "description": "Cari di perpustakaan Navidrome" },

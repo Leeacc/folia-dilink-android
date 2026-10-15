@@ -48,7 +48,7 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
       - name: Test Android runtime and API routing
-        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts test/unit/services/loginTimeout.test.ts test/unit/services/androidMedia.test.ts test/unit/onlineMusic/audioUrlNormalization.test.ts test/unit/onlineMusic/neteaseProvider.test.ts test/unit/onlineMusic/qqAndroidProvider.test.ts test/unit/onlineMusic/qqAndroidTransport.test.ts test/unit/hooks/useQqLibrary.test.ts
+        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts test/unit/services/loginTimeout.test.ts test/unit/services/androidMedia.test.ts test/unit/onlineMusic/audioUrlNormalization.test.ts test/unit/onlineMusic/neteaseProvider.test.ts test/unit/onlineMusic/qqAndroidProvider.test.ts test/unit/onlineMusic/qqAndroidTransport.test.ts test/unit/hooks/useQqLibrary.test.ts test/unit/platform/carInteractions.test.ts
       - name: Test QQ search protocol regression
         run: node --test ci/test-qq-search.cjs
       - name: Build and sync original Folia UI
@@ -83,7 +83,8 @@ jobs:
           grep -F "name='io.github.leeacc.folia.dilink'" artifacts/apk-info.txt
           grep -F "sdkVersion:'26'" artifacts/apk-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree artifacts/folia-dilink-test.apk AndroidManifest.xml > artifacts/manifest.txt
-          grep -F 'android:screenOrientation' artifacts/manifest.txt | grep -F '0x0'
+          grep -F 'android:resizeableActivity' artifacts/manifest.txt | grep -F '0xffffffff'
+          grep -F 'android:foregroundServiceType' artifacts/manifest.txt
           unzip -l artifacts/folia-dilink-test.apk | grep 'assets/public/index.html'
           cp UPSTREAM.json artifacts/
           printf '%s\n' "$GITHUB_SHA" > artifacts/BUILD_COMMIT.txt

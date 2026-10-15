@@ -10,6 +10,7 @@ import type { VisualizerBackgroundConfig } from './components/visualizer/backgro
 import CommandPalette from './components/command-palette/CommandPalette';
 import { useCommandPalette } from './components/command-palette/useCommandPalette';
 import AppShell from './components/app/AppShell';
+import { useCarPlayerInteractions } from './hooks/useCarPlayerInteractions';
 import Home from './components/app/Home';
 import PlayerPanel from './components/app/PlayerPanel';
 import ThemeQuickEditorHost from './components/panelTab/ThemeQuickEditor';
@@ -1802,6 +1803,8 @@ export default function App() {
         visualizerBackgroundMode,
     ]);
     const isSettingsModalOpen = settingsModalState.isOpen;
+    useCarPlayerInteractions({active:currentView==='player',playing:playerState===PlayerState.PLAYING,
+        blocked:isSettingsModalOpen || isPanelOpen,onNext:handleNextTrack,onPrevious:handlePrevTrack});
     const {
         obsBrowserSourceStatus,
         isObsBrowserSourceRendering,
@@ -3167,7 +3170,7 @@ export default function App() {
             </div>
 
             {isCapacitorAndroid() && currentView === 'player' && (
-                <button type="button" aria-label="返回选歌" onClick={navigateBackFromPlayer}
+                <button type="button" data-car-player-control aria-label="返回选歌" onClick={navigateBackFromPlayer}
                     className="fixed top-4 left-4 z-[100] min-h-12 px-4 rounded-full bg-black/70 text-white flex items-center gap-2">
                     <ChevronLeft size={24} />返回选歌
                 </button>

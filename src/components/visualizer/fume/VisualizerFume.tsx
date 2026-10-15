@@ -1,3 +1,4 @@
+import { carCanvasPixelRatio, carFrameInterval, useCarGraphicsBudget } from '../../../utils/carPerformance';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, MotionValue } from 'framer-motion';
 import { layoutWithLines, prepareWithSegments, type PreparedTextWithSegments, type LayoutCursor, type PrepareOptions } from '@chenglou/pretext';
@@ -1611,7 +1612,7 @@ const createStaticBlockSnapshot = (
         return null;
     }
 
-    const rasterScale = clamp(window.devicePixelRatio || 1, 1, 2);
+    const rasterScale = clamp(carCanvasPixelRatio(), 1, 2);
     const padding = Math.ceil(Math.max(block.fontPx * 0.32, shadowBlur + block.fontPx * 0.08, 4));
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.ceil((block.width + padding * 2) * rasterScale));
@@ -1868,6 +1869,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
         subtitleContentMode,
         paused = false,
     } = props;
+    const balancedGraphics = useCarGraphicsBudget();
     const viewportRef = useRef<HTMLDivElement | null>(null);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const currentLineIndexRef = useRef(currentLineIndex);
@@ -2071,6 +2073,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
     useEffect(() => {
         staticBlockSnapshotCacheRef.current.clear();
     }, [
+        balancedGraphics,
         article,
         theme.name,
         theme.primaryColor,
@@ -2099,7 +2102,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
 
         const width = Math.max(Math.floor(viewport.width), 1);
         const height = Math.max(Math.floor(viewport.height), 1);
-        const dpr = window.devicePixelRatio || 1;
+        const dpr = carCanvasPixelRatio();
 
         if (canvas.width !== Math.floor(width * dpr) || canvas.height !== Math.floor(height * dpr)) {
             canvas.width = Math.floor(width * dpr);
@@ -2139,6 +2142,10 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
 
         const draw = () => {
             const now = performance.now();
+            if (document.hidden || (lastFrameAt !== null && now-lastFrameAt < carFrameInterval()-1)) {
+                if (!paused) frameId = window.requestAnimationFrame(draw);
+                return;
+            }
             const dt = lastFrameAt === null
                 ? 1 / 60
                 : clamp((now - lastFrameAt) / 1000, 1 / 240, 0.05);
@@ -2146,7 +2153,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
 
             const currentWidth = Math.max(Math.floor(viewport.width), 1);
             const currentHeight = Math.max(Math.floor(viewport.height), 1);
-            const currentDpr = window.devicePixelRatio || 1;
+            const currentDpr = carCanvasPixelRatio();
 
             if (canvas.width !== Math.floor(currentWidth * currentDpr) || canvas.height !== Math.floor(currentHeight * currentDpr)) {
                 canvas.width = Math.floor(currentWidth * currentDpr);
@@ -2571,7 +2578,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
                         : null;
 
                 if (staticState) {
-                    const snapshotScale = clamp(window.devicePixelRatio || 1, 1, 2);
+                    const snapshotScale = clamp(carCanvasPixelRatio(), 1, 2);
                     const cacheStyleKey = staticState === 'passed' ? effectiveTextHoldStyle : 'base';
                     const cacheKey = `${block.id}:${staticState}:${cacheStyleKey}:${snapshotScale}`;
                     let snapshot = staticBlockSnapshotCacheRef.current.get(cacheKey);
@@ -2955,6 +2962,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
             lastFrameAt = null;
         };
     }, [
+        balancedGraphics,
         article,
         audioBands,
         audioPower,
@@ -3000,7 +3008,7 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
                             scale: article && showText ? (hasPrintedContent ? 1 : 0.985) : 1,
                         }}
                         transition={{ duration: 0.45, ease: 'easeOut' }}
-                        className="absolute left-1/2 top-0 -translate-x-1/2"
+                        className="absolute inset-0"
                         style={{
                             width: viewport.width,
                             height: viewport.height,
