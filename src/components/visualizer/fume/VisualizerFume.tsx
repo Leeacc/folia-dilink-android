@@ -14,6 +14,8 @@ import { getRecentCompletedLine, getUpcomingLines } from '../runtime';
 import VisualizerShell from '../VisualizerShell';
 import VisualizerSubtitleOverlay from '../VisualizerSubtitleOverlay';
 import { resolveWordColor } from '../wordColoring';
+import { isCapacitorAndroid } from '../../../platform/runtime';
+import { fitCarLyricBlock } from './carCamera';
 
 // This mode is basically "turn the whole lyric into an article, then move a camera through it".
 // So the pipeline is much bigger than the others: prebuild the article layout, split it into blocks/render lines/graphemes,
@@ -2258,6 +2260,13 @@ const VisualizerFume: React.FC<VisualizerProps> = (props) => {
                 targetCameraX = focusPoint.x;
                 targetCameraY = focusPoint.y;
                 targetCameraScale = resolveCameraScaleForBlock(focusBlock, viewport);
+                if (isCapacitorAndroid() && viewport.width < viewport.height * 1.4) {
+                    const fitted = fitCarLyricBlock(focusBlock, viewport, targetCameraScale);
+                    targetCameraX = fitted.x;
+                    targetCameraY = fitted.y;
+                    targetCameraScale = fitted.scale;
+                    entryFocusPoint = { x: fitted.x, y: fitted.y };
+                }
 
                 if (cameraRetargetRef.current.sourceLineIndex !== focusBlock.sourceLineIndex) {
                     cameraRetargetRef.current = {

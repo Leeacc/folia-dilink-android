@@ -21,6 +21,7 @@ public class CarMediaService extends MediaBrowserService {
     static CarMediaService instance;
     interface CommandListener { void onCommand(String action, long position); }
     static CommandListener listener;
+    static String lastCommand = "";
     private MediaSession session;
     private MediaMetadata metadata;
     private boolean playing, foreground;
@@ -32,6 +33,8 @@ public class CarMediaService extends MediaBrowserService {
     private static final String CHANNEL = "folia_playback";
     private static final int NOTIFICATION = 7;
     static void command(String action, long position) {
+        lastCommand = action;
+        android.util.Log.i("FoliaCarMedia", "Transport " + action + ", connected=" + (listener != null));
         if (listener != null) listener.onCommand(action, position);
     }
     static boolean handleKey(KeyEvent event) {
@@ -120,9 +123,9 @@ public class CarMediaService extends MediaBrowserService {
             .setSmallIcon(R.drawable.ic_media_note).setContentTitle(metadata.getString(MediaMetadata.METADATA_KEY_TITLE))
             .setContentText(metadata.getString(MediaMetadata.METADATA_KEY_ARTIST)).setContentIntent(session.getController().getSessionActivity())
             .setVisibility(Notification.VISIBILITY_PUBLIC).setOnlyAlertOnce(true).setOngoing(playing)
-            .addAction(new Notification.Action.Builder(R.drawable.ic_media_note, "上一曲", action("previous")).build())
-            .addAction(new Notification.Action.Builder(R.drawable.ic_media_note, playing ? "暂停" : "播放", action(playing ? "pause" : "play")).build())
-            .addAction(new Notification.Action.Builder(R.drawable.ic_media_note, "下一曲", action("next")).build())
+            .addAction(new Notification.Action.Builder(android.R.drawable.ic_media_previous, "上一曲", action("previous")).build())
+            .addAction(new Notification.Action.Builder(playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play, playing ? "暂停" : "播放", action(playing ? "pause" : "play")).build())
+            .addAction(new Notification.Action.Builder(android.R.drawable.ic_media_next, "下一曲", action("next")).build())
             .setStyle(new Notification.MediaStyle().setMediaSession(session.getSessionToken()).setShowActionsInCompactView(0,1,2));
         Bitmap image = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
         if (image != null) builder.setLargeIcon(image);

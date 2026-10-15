@@ -55,7 +55,9 @@ public class CarMediaPlugin extends Plugin {
     @PluginMethod public void diagnostics(PluginCall call) {
         JSObject data = volume().put("manufacturer",android.os.Build.MANUFACTURER).put("model",android.os.Build.MODEL)
             .put("android",android.os.Build.VERSION.RELEASE).put("sdk",android.os.Build.VERSION.SDK_INT)
-            .put("multiWindow",getActivity().isInMultiWindowMode()).put("mediaSession",CarMediaService.instance != null);
+            .put("multiWindow",getActivity().isInMultiWindowMode()).put("mediaSession",CarMediaService.instance != null)
+            .put("commandConnected",CarMediaService.listener != null).put("commandSubscribed",hasListeners("command"))
+            .put("lastCommand",CarMediaService.lastCommand);
         call.resolve(data);
     }
     @Override protected void handleOnDestroy() {

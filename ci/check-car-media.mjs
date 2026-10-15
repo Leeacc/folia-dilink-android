@@ -10,6 +10,13 @@ ws.addEventListener('message',event=>{const data=JSON.parse(event.data);const cu
 const call=(method,params={})=>new Promise((resolve,reject)=>{const id=nextId++;const timer=setTimeout(()=>{pending.delete(id);reject(new Error('Car WebView check timed out'));},90000);pending.set(id,{resolve,timer});ws.send(JSON.stringify({id,method,params}));});
 const evaluate=async expression=>{const data=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true,userGesture:true});if(data.result?.exceptionDetails)throw new Error(data.result.exceptionDetails.exception?.description || data.result.exceptionDetails.text);return data.result?.result?.value;};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const waitForAudio=async paused=>{
+    for(let attempt=0;attempt<30;attempt++){
+        if(await evaluate(`document.querySelector('audio').paused === ${paused}`))return true;
+        await delay(500);
+    }
+    return false;
+};
 const adb=(...args)=>execFileSync('adb',args,{encoding:'utf8',timeout:30000});
 const report={fixture:'Public NetEase stream 1909126284, synthetic cached display title; real native Android bridge',device:'emulator, not DiLink hardware'};
 try {
@@ -39,9 +46,11 @@ try {
         await evaluate(`window.Capacitor.nativePromise('CarMedia','setVolume',{value:${before.value}})`);
         if(!report.hardwareVolume)throw new Error('Hardware key did not change STREAM_MUSIC volume');
         adb('shell','cmd','media_session','dispatch','pause');await delay(1000);
-        report.systemPause=await evaluate('document.querySelector("audio").paused');
+        report.systemPause=await waitForAudio(true);
         adb('shell','cmd','media_session','dispatch','play');await delay(1500);
-        report.systemPlay=await evaluate('!document.querySelector("audio").paused');
+        report.systemPlay=await waitForAudio(false);
+        report.transportDiagnostics=await evaluate("window.Capacitor.nativePromise('CarMedia','diagnostics',{})");
+        report.nativeCommands=await evaluate('window.__carNativeCommands');
         if(!report.systemPause || !report.systemPlay)throw new Error('System controller did not pause/resume the app audio');
         for(const command of ['next','previous']){adb('shell','cmd','media_session','dispatch',command);await delay(1200);}
         report.nativeCommands=await evaluate('window.__carNativeCommands');
@@ -56,9 +65,9 @@ try {
         writeFileSync('artifacts/car-foreground-service.txt',adb('shell','dumpsys','activity','services','io.github.leeacc.folia.dilink'));
         if(!report.backgroundAudio)throw new Error('App audio stopped when returning to the launcher');
         adb('shell','cmd','media_session','dispatch','pause');await delay(1000);
-        report.backgroundPause=await evaluate('document.querySelector("audio").paused');
+        report.backgroundPause=await waitForAudio(true);
         adb('shell','cmd','media_session','dispatch','play');await delay(1500);
-        report.backgroundPlay=await evaluate('!document.querySelector("audio").paused');
+        report.backgroundPlay=await waitForAudio(false);
         if(!report.backgroundPause || !report.backgroundPlay)throw new Error('Background media transport failed');
         adb('shell','am','start','-n','io.github.leeacc.folia.dilink/top.izuna.foliamajor.MainActivity');await delay(1500);
         // Window-manager support differs across emulator images/OEMs. Record actual support, never infer it from a viewport resize.

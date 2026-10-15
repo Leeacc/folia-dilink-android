@@ -131,6 +131,10 @@ export function useCarPlayerInteractions({
             if (hidden) ignoreClickUntil = Date.now() + 450;
             reset();
         };
+        const pointerMove = (event: PointerEvent) => {
+            // A held progress/volume slider is still an interaction even though gestures exclude it.
+            if (event.buttons && !gesture) reset();
+        };
         reset();
         window.addEventListener('touchstart', start, { capture: true, passive: true });
         window.addEventListener('touchmove', move, { capture: true, passive: false });
@@ -138,6 +142,8 @@ export function useCarPlayerInteractions({
         window.addEventListener('touchcancel', cancel, { capture: true, passive: true });
         window.addEventListener('click', click, true);
         window.addEventListener('pointerdown', wake, true);
+        window.addEventListener('pointermove', pointerMove, true);
+        window.addEventListener('pointerup', wake, true);
         window.addEventListener('keydown', wake);
         return () => {
             clearTimeout(timer);
@@ -149,6 +155,8 @@ export function useCarPlayerInteractions({
             window.removeEventListener('touchcancel', cancel, true);
             window.removeEventListener('click', click, true);
             window.removeEventListener('pointerdown', wake, true);
+            window.removeEventListener('pointermove', pointerMove, true);
+            window.removeEventListener('pointerup', wake, true);
             window.removeEventListener('keydown', wake);
         };
     }, [active, playing, blocked, settings.immersive, settings.horizontalFingers, settings.verticalFingers]);
