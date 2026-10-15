@@ -86,6 +86,8 @@ public class CarMediaService extends MediaBrowserService {
             stopForeground(STOP_FOREGROUND_REMOVE); stopSelf(); return START_NOT_STICKY;
         }
         String nextCover = intent.getStringExtra("cover");
+        // Provider metadata may still use HTTP even when the artwork CDN supports HTTPS.
+        if (nextCover != null && nextCover.startsWith("http://")) nextCover = "https://" + nextCover.substring(7);
         String nextKey = intent.getStringExtra("title") + "|" + intent.getStringExtra("artist") + "|" + intent.getStringExtra("album") + "|" + nextCover + "|" + intent.getLongExtra("duration",0);
         boolean changed = !Objects.equals(metadataKey,nextKey);
         if (changed) {
@@ -96,6 +98,10 @@ public class CarMediaService extends MediaBrowserService {
             .putString(MediaMetadata.METADATA_KEY_ARTIST, intent.getStringExtra("artist"))
             .putString(MediaMetadata.METADATA_KEY_ALBUM, intent.getStringExtra("album"))
             .putLong(MediaMetadata.METADATA_KEY_DURATION, intent.getLongExtra("duration", 0));
+        if (nextCover != null && nextCover.startsWith("https://")) {
+            builder.putString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI, nextCover)
+                .putString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI, nextCover);
+        }
         if (Objects.equals(cover, nextCover) && metadata != null) {
             Bitmap image = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART);
             if (image != null) builder.putBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART, image);

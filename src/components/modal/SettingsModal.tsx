@@ -1407,7 +1407,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                 animate="center"
                                 exit="exit"
                                 transition={shellTransition}
-                                className="flex flex-col md:flex-row gap-4 md:gap-6 h-full"
+                                className="flex flex-col md:flex-row gap-4 md:gap-6 h-full min-w-0 w-full"
                             >
                                 <div
                                     ref={scrollContainerRef}
@@ -1442,7 +1442,7 @@ const SettingsModal: React.FC<SettingsModalProps> = ({
                                         );
                                     })}
                                 </div>
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pl-1 md:pl-2 pr-2 md:pr-4 relative pb-4">
+                                <div className="flex-1 min-w-0 overflow-y-auto custom-scrollbar pl-1 md:pl-2 pr-2 md:pr-4 relative pb-4">
                                     <div className="mb-4 md:mb-6 border-b border-white/10 pb-3 md:pb-4">
                                         <div className="flex items-start justify-between gap-4">
                                             <div>

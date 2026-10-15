@@ -53,7 +53,11 @@ try {
         report.nativeCommands=await evaluate('window.__carNativeCommands');
         if(!report.systemPause || !report.systemPlay)throw new Error('System controller did not pause/resume the app audio');
         for(const command of ['next','previous']){adb('shell','cmd','media_session','dispatch',command);await delay(1200);}
-        report.nativeCommands=await evaluate('window.__carNativeCommands');
+        for(let attempt=0;attempt<30;attempt++){
+            report.nativeCommands=await evaluate('window.__carNativeCommands');
+            if(['next','previous'].every(command=>report.nativeCommands.includes(command)))break;
+            await delay(500);
+        }
         if(!['pause','play','next','previous'].every(command=>report.nativeCommands.includes(command)))throw new Error('Native transport command did not reach the app');
         await evaluate('document.querySelector("audio").play()');await delay(1200);
         await delay(5500);
