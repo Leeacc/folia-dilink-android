@@ -2,6 +2,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { type ConfigEnv, type UserConfig, type ViteDevServer } from 'vite';
 import react from '@vitejs/plugin-react';
+import { androidCssBundle } from './build/androidCssBundle.mjs';
 import { commandPinyinPlugin } from './dev/pinyin/commandPinyinPlugin.mjs';
 import { icuFoliaDataPlugin } from './dev/icuFolia/icuFoliaDataPlugin.mjs';
 import { normalizeBuildCommit, resolveBuildKind, resolveBuildRepo, resolveDevBuildKindOverride } from './dev/build/buildIdentity.mjs';
@@ -213,7 +214,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       include: ['music-metadata'],
     },
     build: {
-      ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? { target: 'chrome95', cssTarget: 'chrome95' } : {}),
+      ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? { target: 'chrome95', cssTarget: 'chrome95', cssCodeSplit: false } : {}),
       rollupOptions: {
         input: {
           main: 'index.html',
@@ -270,6 +271,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       commandPinyinPlugin(),
       icuFoliaDataPlugin(),
       react(),
+      ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? [androidCssBundle()] : []),
       ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? [] : [VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['icon.svg'],
