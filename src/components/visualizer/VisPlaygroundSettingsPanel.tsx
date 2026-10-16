@@ -277,7 +277,7 @@ const SectionTabs: React.FC<Pick<VisPlaygroundSettingsPanelProps, 'activeSection
     theme,
     isDaylight,
 }) => (
-    <div className="inline-flex w-fit items-center gap-1 rounded-full p-1" style={{ backgroundColor: colorWithAlpha(theme.backgroundColor, isDaylight ? 0.34 : 0.52) }}>
+    <div className="inline-flex w-fit max-w-full shrink-0 flex-wrap items-center gap-1 rounded-full p-1" style={{ backgroundColor: colorWithAlpha(theme.backgroundColor, isDaylight ? 0.34 : 0.52) }}>
         {SECTION_OPTIONS.map(section => {
             const active = activeSection === section;
             return (
@@ -425,7 +425,7 @@ const VisPlaygroundSettingsPanel: React.FC<VisPlaygroundSettingsPanelProps> = (p
     ), [t]);
 
     return (
-        <div className="min-h-0 flex flex-col gap-4">
+        <div className="vis-playground-settings min-h-0 min-w-0 flex flex-col gap-4">
             <SectionTabs
                 activeSection={activeSection}
                 onSectionChange={onSectionChange}
@@ -434,7 +434,7 @@ const VisPlaygroundSettingsPanel: React.FC<VisPlaygroundSettingsPanelProps> = (p
                 isDaylight={isDaylight}
             />
 
-            <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-4">
+            <div className="vis-playground-settings-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 custom-scrollbar space-y-4">
                 {activeSection === 'common' && (
                     <div className="rounded-[24px] border p-4 space-y-4" style={{ backgroundColor: controlCardBg, borderColor: colorWithAlpha(theme.secondaryColor, 0.16) }}>
                         <div className="flex items-start justify-between gap-3">

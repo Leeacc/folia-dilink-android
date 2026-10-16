@@ -49,6 +49,8 @@ const fs = require('node:fs');
   await page.screenshot({path: 'artifacts/chromium95/settings.png'});
   fs.writeFileSync('artifacts/chromium95/interaction.txt', after);
   if (after === before.text || errors.length) throw new Error(`Settings did not open cleanly: ${errors.join(';')}`);
+  await require('./check-visualizer-settings.cjs')(page);
+  await page.setViewportSize({width: 1920, height: 1080});
   await page.reload({waitUntil: 'domcontentloaded'});
   // The dialog stays in this SPA; assert its rendered state instead of waiting on unrelated navigation.
   // The old Playwright scroll-into-view path can stall on Chromium 95 after a reload.

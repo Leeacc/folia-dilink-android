@@ -61,6 +61,12 @@ public class CarMediaPlugin extends Plugin {
         getActivity().runOnUiThread(() -> {
             data.put("nativeAudio", NativeAudioPlugin.instance == null ? "unavailable" : NativeAudioPlugin.instance.snapshot())
                 .put("requestedOrientation", getActivity().getRequestedOrientation())
+                .put("lastBrowserClient", CarMediaService.lastBrowserClient)
+                .put("windowBars", new JSObject()
+                    .put("statusColor", getActivity().getWindow().getStatusBarColor())
+                    .put("navigationColor", getActivity().getWindow().getNavigationBarColor())
+                    .put("statusContrast", Build.VERSION.SDK_INT >= 29 && getActivity().getWindow().isStatusBarContrastEnforced())
+                    .put("navigationContrast", Build.VERSION.SDK_INT >= 29 && getActivity().getWindow().isNavigationBarContrastEnforced()))
                 .put("legacyMedia", CarMediaService.instance == null ? "inactive" : CarMediaService.instance.legacyStatus())
                 .put("oem", DiLinkCapabilities.inspect(getContext()));
             call.resolve(data);

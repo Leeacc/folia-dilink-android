@@ -1,0 +1,23 @@
+/* Keep the live preview from consuming the settings viewport in a DiLink split pane. */
+.vis-playground-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 2fr) minmax(0, 3fr);
+}
+
+@media (min-width: 1024px) {
+    .vis-playground-layout {
+        grid-template-columns: minmax(0, 1.25fr) 360px;
+        grid-template-rows: minmax(0, 1fr);
+    }
+}
+
+/* Short landscape panes benefit more from side-by-side controls than a tiny lower strip. */
+@media (min-width: 680px) and (max-height: 480px) {
+    .vis-playground-layout {
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 1fr);
+        grid-template-rows: minmax(0, 1fr);
+        padding: 12px;
+        gap: 12px;
+    }
+}

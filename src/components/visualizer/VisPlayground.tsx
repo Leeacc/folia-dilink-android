@@ -52,6 +52,7 @@ import VisPlaygroundPreviewHotspots, { type VisPlaygroundEditSection } from './V
 import VisPlaygroundSettingsPanel from './VisPlaygroundSettingsPanel';
 import type { VisualizerBackgroundActions, VisualizerBackgroundConfig } from './backgrounds/definition';
 import { useVisPlaygroundPreviewPlayback } from './useVisPlaygroundPreviewPlayback';
+import './VisPlayground.css';
 
 interface VisPlaygroundProps {
     theme?: Theme;
@@ -1054,7 +1055,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                 onClick={(event) => event.stopPropagation()}
                 className={`mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden rounded-[32px] border ${borderColor} ${glassBg} shadow-[0_24px_80px_rgba(0,0,0,0.28)]`}
             >
-                <div className="flex items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
+                <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
                     <div className="flex items-center gap-3 min-w-0">
                         <button
                             type="button"
@@ -1072,8 +1073,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                     </div>
                 </div>
 
-                <div className="grid min-h-0 flex-1 gap-4 p-4 sm:p-6 lg:grid-cols-[minmax(0,1.25fr)_360px]">
-                    <div className="relative min-h-[320px] overflow-hidden rounded-[28px] border border-white/10 bg-black/20">
+                <div className="vis-playground-layout min-h-0 flex-1 gap-4 p-4 sm:p-6">
+                    <div className="vis-playground-preview relative min-h-0 min-w-0 overflow-hidden rounded-[28px] border border-white/10 bg-black/20">
                         <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs uppercase tracking-[0.22em] backdrop-blur-md" style={{ color: 'rgba(255,255,255,0.78)' }}>
                             <Sparkles size={13} />
                             <span>{t('ui.livePreview')}</span>

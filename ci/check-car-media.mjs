@@ -45,6 +45,9 @@ try {
         if(native.gain>0.2001)throw new Error('Initial native gain exceeded startup guard');
         if(report.nativeDiagnostics.requestedOrientation!==-1)throw new Error('Activity still requests an orientation lock');
         if(report.nativeDiagnostics.oem?.splitManifestValue!==1)throw new Error('Packaged BYD split eligibility marker missing or not an integer');
+        const bars=report.nativeDiagnostics.windowBars;
+        if(!bars || bars.statusColor!==0 || bars.navigationColor!==0 || bars.statusContrast || bars.navigationContrast)
+            throw new Error('Application system-bar transparency request regressed');
         report.gainSteps=[];
         for(const value of [.01,.05,.2,.5,1]){
             await evaluate(`(async()=>{document.querySelector('audio').volume=${value};await new Promise(r=>setTimeout(r,400));})()`);

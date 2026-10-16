@@ -21,6 +21,7 @@ public class MainActivity extends BridgeActivity {
         super.onCreate(savedInstanceState);
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        configureSystemBars();
         if (bridge != null) {
             bridge.getWebView().setWebViewClient(new MusicWebViewClient(bridge));
             View container = (View) bridge.getWebView().getParent();
@@ -62,9 +63,13 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void enterFullscreen() {
+        configureSystemBars();
         if (isInMultiWindowMode()) {
             getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).show(WindowInsetsCompat.Type.systemBars());
+            // Keep the system-owned pane caption available; do not explicitly restore opaque bars.
+            WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).hide(
+                WindowInsetsCompat.Type.statusBars() | WindowInsetsCompat.Type.navigationBars()
+            );
             return;
         }
         // Older Android splash/window code can restore the status bar after UI flags change.
@@ -78,5 +83,16 @@ public class MainActivity extends BridgeActivity {
             WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         );
         controller.hide(WindowInsetsCompat.Type.systemBars());
+    }
+
+    private void configureSystemBars() {
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 28) getWindow().setNavigationBarDividerColor(android.graphics.Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= 29) {
+            getWindow().setStatusBarContrastEnforced(false);
+            getWindow().setNavigationBarContrastEnforced(false);
+        }
     }
 }

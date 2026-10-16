@@ -1,6 +1,6 @@
 # Folia for DiLink — 横屏测试版
 
-面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云、酷狗与 QQ 音乐服务。车机已确认 R5 的网易云/酷狗登录、搜索、播放和歌词可用，用户已实车确认 R8 音量和方向盘音量/切歌正常；不是官方 Android 客户端。
+面向 2025 款秦 L EV / DiLink 100 UI 7.0 的实验性 APK。保留 Folia-Sonnet 主要界面，内置网易云、酷狗与 QQ 音乐服务。车机已确认 R5 的网易云/酷狗登录、搜索、播放和歌词可用，用户已实车确认 R8 音量和方向盘音量/切歌正常、R9 可进入原厂分屏；不是官方 Android 客户端。
 
 ## 下载 APK（无需 Android Studio）
 
@@ -14,14 +14,14 @@
 ## 来源与实际版本
 
 - 源码：[`chthollyphile/folia-sonnet`](https://github.com/chthollyphile/folia-sonnet)，固定提交 `5a2c3148cc78c51a5c2df15d7d0d34c120c24873`，基于 **Folia 0.6.7**。
-- 对照检查的主项目 [`chthollyphile/folia-major`](https://github.com/chthollyphile/folia-major) 最新正式 release 为 **v0.7.16**；本 APK 不冒充该版本，也未将新版桌面代码混入 Android 示例。
+- 对照检查的主项目 [`chthollyphile/folia-major`](https://github.com/chthollyphile/folia-major) 截至 2026-10-16 的最新正式 release 为 **v0.7.20**；本 APK 的 Android 基线仍为 0.6.7。初次对照使用的 0.7.16 提交保留在 UPSTREAM.json，不代表持续同步。
 - 原 README 保存在 [README.upstream.md](README.upstream.md)，来源记录见 [UPSTREAM.json](UPSTREAM.json)。保留上游源码、资源和 AGPL-3.0 [许可证](LICENSE)。
 
 ## 本仓库的改动
 
 - 不再锁定窗口方向，允许车机多窗口调整尺寸，保留原版界面与原图标。
 - 独立安装包 ID：`io.github.leeacc.folia.dilink`，不覆盖上游 `top.izuna.foliamajor`。
-- 版本名 `0.6.7-dilink-r9-split`；CI versionCode 使用运行编号。
+- 版本名 `0.6.7-dilink-r10-pane`；CI versionCode 使用运行编号。
 - 工作流使用 Node 24、JDK 21、Capacitor 8.4.2、AGP 8.13.0、Gradle 8.14.3、Android Platform 36.1；最低 Android 8 / API 26，target API 36。**显示原版 UI 还要求 Android System WebView 95+**，最低安装版本不等于最低可用 WebView 版本。
 - 移除上游桌面发布及 Docker 发布工作流，仅保留本仓库 Android 构建流程。保留原版组件和布局，补充 Android 系统栏处理及登录失败提示；构建目标明确为 Chrome/WebView 95，低于此版本显示独立兼容性提示页，避免黑屏。
 - macOS/Linux 构建脚本使用 Gradle shell wrapper；Windows 可在同步后执行 `android\gradlew.bat`。
@@ -158,3 +158,12 @@ versionCode **39**，版本名 `0.6.7-dilink-r9-split`，APK 源码 `199fd34771b
 已同时核对编译后的二进制 Manifest 及模拟器 PackageManager：应用级 BYD_SUPPORT_SPLIT_ACTIVITY 为整数 1。API 35 的系统音量键、播放/暂停、上下曲指令、后台播放/控制、五秒隐藏、实际多窗口 412×732 无横向溢出通过；网易云播放、酷狗公开试听原生播放/跳转与 QQ 搜索/二维码检查通过。上述标准环境通过仍不能证明秦 L EV UI7 候选已经接纳 Folia，也不能证明主页卡片已经修复。
 
 APK SHA-256：`f19990a2b2ad81c5ffcb33b93e3f3b4fc0b291c8bdf0eec324b61fa17ab06d6d`。
+
+
+## r10：分屏设置布局与系统栏请求
+
+2026-10-16 用户确认 R9 已能进入秦 L EV UI7 的原厂分屏；此结论来自实车反馈。设置页在窄窗中改为明确分配预览/设置高度，移除预览 320px 的最低高度；短横窗改为左右排列，设置标签允许换行，各页内容独立滚动。无新增高频 React 状态或动画循环。
+
+应用请求透明状态栏、导航栏及分隔线，关闭系统自动对比色遮罩；分屏时不再主动恢复所有系统栏。保留原有窗口安全边距和车机拖动控件。**这些设置不等于能够移除车机 DecorView 绘制的分屏标题条**，实际黑条效果仍须车机复测。
+
+原厂音乐卡片仍未修复，用户照片证实它保留汽水图标/歌曲。增加只读的系统栏属性和最近 MediaBrowser 连接方诊断；没有连接记录并不能单独证明车机拒绝 MediaSession，因为控制器也可直接读取媒体会话。未改变 R8 的原生音轨、音频焦点、增益与按键逻辑。详见 [R10 核查](docs/dilink-r10-pane-upstream.md)。

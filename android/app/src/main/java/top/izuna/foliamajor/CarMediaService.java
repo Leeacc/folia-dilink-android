@@ -22,6 +22,7 @@ public class CarMediaService extends MediaBrowserService {
     interface CommandListener { void onCommand(String action, long position); }
     static CommandListener listener;
     static String lastCommand = "";
+    static String lastBrowserClient = "none";
     private MediaSession session;
     private MediaMetadata metadata;
     private LegacyCarMedia legacy;
@@ -187,7 +188,12 @@ public class CarMediaService extends MediaBrowserService {
             finally { if (connection != null) connection.disconnect(); }
         });
     }
-    @Override public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle hints) { return new BrowserRoot("root", null); }
+    @Override public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle hints) {
+        // Read-only evidence of a controller actually binding, without logging account or track data.
+        lastBrowserClient = clientPackageName;
+        android.util.Log.i("FoliaCarMedia", "Media browser client: " + clientPackageName);
+        return new BrowserRoot("root", null);
+    }
     @Override public void onLoadChildren(String parentId, Result<List<MediaBrowser.MediaItem>> result) {
         List<MediaBrowser.MediaItem> items = new ArrayList<>();
         if ("root".equals(parentId) && metadata != null) items.add(new MediaBrowser.MediaItem(metadata.getDescription(), MediaBrowser.MediaItem.FLAG_PLAYABLE));
