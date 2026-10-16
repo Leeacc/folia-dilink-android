@@ -54,13 +54,12 @@ const deadline = setTimeout(() => process.exit(1), 600000);
             const errors=[];page.on('pageerror',e=>errors.push(e.message));
             await page.goto(`${base}/dev-probe.html?probe=visualizerMemory&vis=${mode}&lines=24&speed=2&start=3`,{waitUntil:'domcontentloaded'});
             await page.waitForSelector(`[data-probe-mode="${mode}"]`,{timeout:60000});
-            if (['lumiere','sonnet','tempera'].includes(mode)) {
-                await page.waitForSelector('[data-pixi-runtime="ready"] canvas', {timeout:120000});
-                await page.waitForTimeout(1200);
-            } else await page.waitForTimeout(2500);
+            const pixi = ['lumiere','sonnet','tempera'].includes(mode)
+                ? await require('./check-pixi-draw.cjs')(page) : null;
+            if(!pixi) await page.waitForTimeout(2500);
             const sample=await page.evaluate(()=>({children:document.querySelector('[data-probe-mode]')?.children.length,canvases:document.querySelectorAll('canvas').length}));
             await page.screenshot({path:`${out}/${mode}.png`});
-            report.modes.push({mode,...sample,errors});
+            report.modes.push({mode,...sample,pixi,errors});
             console.log(JSON.stringify(report.modes[report.modes.length-1]));
             if(errors.length || !sample.children)throw new Error(`${mode} failed: ${errors.join(';')}`);
             await page.close();
