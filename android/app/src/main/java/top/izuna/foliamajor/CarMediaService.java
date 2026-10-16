@@ -15,6 +15,7 @@ import java.util.concurrent.Executors;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.io.*;
+import com.getcapacitor.JSObject;
 
 // Publishes the WebView player's real state to standard Android/OEM media controllers.
 public class CarMediaService extends MediaBrowserService {
@@ -54,6 +55,7 @@ public class CarMediaService extends MediaBrowserService {
         long now = SystemClock.elapsedRealtime();
         if (code == lastKeyCode && now - lastKeyAt < 160) return true;
         lastKeyCode = code; lastKeyAt = now;
+        CarControllerEvidence.key(code);
         if (byd && (code == 353 || code == KeyEvent.KEYCODE_MEDIA_PLAY || code == KeyEvent.KEYCODE_MEDIA_PAUSE)) {
             command(instance.playing ? "pause" : "play", 0); return true;
         }
@@ -81,23 +83,46 @@ public class CarMediaService extends MediaBrowserService {
         session.setPlaybackToLocal(new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA).setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build());
         session.setSessionActivity(PendingIntent.getActivity(this, 0, new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
         session.setCallback(new MediaSession.Callback() {
-            @Override public void onPlay() { command("play", 0); }
-            @Override public void onPause() { command("pause", 0); }
-            @Override public void onStop() { command("pause", 0); }
-            @Override public void onSkipToNext() { command("next", 0); }
-            @Override public void onSkipToPrevious() { command("previous", 0); }
-            @Override public void onSeekTo(long pos) { command("seek", pos); }
-            @Override public void onPlayFromMediaId(String id, Bundle extras) { command("play", 0); }
+            @Override public void onPlay() { remoteCommand("play", 0); }
+            @Override public void onPause() { remoteCommand("pause", 0); }
+            @Override public void onStop() { remoteCommand("pause", 0); }
+            @Override public void onSkipToNext() { remoteCommand("next", 0); }
+            @Override public void onSkipToPrevious() { remoteCommand("previous", 0); }
+            @Override public void onSeekTo(long pos) { remoteCommand("seek", pos); }
+            @Override public void onPlayFromMediaId(String id, Bundle extras) { remoteCommand("play", 0); }
             @Override public boolean onMediaButtonEvent(Intent intent) {
+                recordController("media_button");
                 KeyEvent event = intent.getParcelableExtra(Intent.EXTRA_KEY_EVENT);
                 return event != null && handleKey(event);
             }
         }, handler);
         setSessionToken(session.getSessionToken());
     }
+    private void recordController(String action) {
+        String caller = "unavailable_before_api28";
+        if (Build.VERSION.SDK_INT >= 28) {
+            try { caller = session.getCurrentControllerInfo().getPackageName(); }
+            catch (RuntimeException error) { caller = "unavailable"; }
+        }
+        CarControllerEvidence.command(caller, action);
+    }
+    private void remoteCommand(String action, long position) {
+        recordController(action);
+        command(action, position);
+    }
+    JSObject controllerState() {
+        JSObject data = CarControllerEvidence.snapshot();
+        PlaybackState state = session.getController().getPlaybackState();
+        data.put("active", session.isActive()).put("playbackState", state == null ? -1 : state.getState())
+            .put("hasMetadata", metadata != null).put("notificationEnabled", getSystemService(NotificationManager.class).areNotificationsEnabled());
+        return data;
+    }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) { stopSelf(); return START_NOT_STICKY; }
-        if (intent.hasExtra("command")) { command(intent.getStringExtra("command"), 0); return START_NOT_STICKY; }
+        if (intent.hasExtra("command")) {
+            CarControllerEvidence.serviceIntent(intent.getStringExtra("command"));
+            command(intent.getStringExtra("command"), 0); return START_NOT_STICKY;
+        }
         boolean wasPlaying = playing;
         playing = intent.getBooleanExtra("playing", false);
         position = Math.max(0, intent.getLongExtra("position", 0));
@@ -191,6 +216,7 @@ public class CarMediaService extends MediaBrowserService {
     @Override public BrowserRoot onGetRoot(String clientPackageName, int clientUid, Bundle hints) {
         // Read-only evidence of a controller actually binding, without logging account or track data.
         lastBrowserClient = clientPackageName;
+        CarControllerEvidence.browser(clientPackageName);
         android.util.Log.i("FoliaCarMedia", "Media browser client: " + clientPackageName);
         return new BrowserRoot("root", null);
     }

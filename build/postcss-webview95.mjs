@@ -9,7 +9,8 @@ export default function webview95Transforms() {
     OnceExit(root) {
       const defaults = postcss.rule({ selector: '*,::before,::after' });
       for (const part of parts) defaults.append({ prop: `--folia-compat-${part}`, value: ' ' });
-      root.prepend(defaults);
+      // Per-element resets clear inherited parts but must not defeat Tailwind's utility transforms.
+      root.prepend(postcss.atRule({name: 'layer', params: 'properties', nodes: [defaults]}));
       root.walkRules(rule => {
         if (rule.parent?.type === 'atrule' && /keyframes$/.test(rule.parent.name)) return;
         const declarations = rule.nodes.filter(node => node.type === 'decl' && parts.includes(node.prop));

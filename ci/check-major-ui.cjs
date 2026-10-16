@@ -28,6 +28,7 @@ const deadline = setTimeout(() => process.exit(1), 600000);
         await page.screenshot({path:out+'/bravais-home.png'});
         if(errors.length)throw new Error(errors.join(';'));
         await require('./check-visualizer-settings.cjs')(page);
+        await require('./check-wall-tools.cjs')(page);
         await page.close();
         page=await browser.newPage({viewport:{width:1280,height:720},hasTouch:true});
         await page.goto(`${base}/dev-probe.html?probe=bravaisKinds`,{waitUntil:'domcontentloaded'});

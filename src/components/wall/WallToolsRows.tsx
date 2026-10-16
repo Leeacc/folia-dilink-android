@@ -187,6 +187,7 @@ export function WallToolsQuickRow({ actions, onDone }: { actions: readonly WallT
                         }}
                     >
                         <Icon aria-hidden="true" />
+                        <span className="lattice-tools-quick-label" aria-hidden="true">{action.label}</span>
                     </button>
                 );
             })}

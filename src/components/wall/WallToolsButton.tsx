@@ -12,6 +12,7 @@ import { useWallToolsCommonActions } from './useWallToolsCommonActions';
 import { WallToolsQueueIsland } from './WallToolsQueueIsland';
 import { useWallToolsHost } from './wallToolsHost';
 import './WallToolsButton.css';
+import './WallToolsCar.css';
 
 // src/components/wall/WallToolsButton.tsx
 // 海报墙右下角的工具按钮（Lattice 与 bravais 共用）：点按打开锚定的玻璃面板，向左滑打开命令面板。
@@ -156,6 +157,7 @@ export function WallToolsSurface({ idPrefix, label, isDaylight, locate, destinat
     return (
         <motion.div
             ref={rootRef}
+            data-car-no-gesture
             style={{ bottom: bottomPx, '--wall-tools-bottom': bottomVar } as unknown as MotionStyle}
             className={`lattice-tools group ${isDaylight ? 'is-daylight' : ''}`}
         >
