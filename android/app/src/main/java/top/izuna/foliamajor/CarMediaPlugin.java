@@ -62,6 +62,7 @@ public class CarMediaPlugin extends Plugin {
             data.put("nativeAudio", NativeAudioPlugin.instance == null ? "unavailable" : NativeAudioPlugin.instance.snapshot())
                 .put("requestedOrientation", getActivity().getRequestedOrientation())
                 .put("lastBrowserClient", CarMediaService.lastBrowserClient)
+                .put("controllerEvidence", CarMediaService.instance == null ? CarControllerEvidence.snapshot() : CarMediaService.instance.controllerState())
                 .put("windowBars", new JSObject()
                     .put("statusColor", getActivity().getWindow().getStatusBarColor())
                     .put("navigationColor", getActivity().getWindow().getNavigationBarColor())

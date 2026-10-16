@@ -1,0 +1,74 @@
+/* Car touch layout for the shared Bravais/Lattice tools. Keep desktop geometry unchanged. */
+.lattice-tools-quick-label { display: none; }
+
+html[data-runtime="capacitor-android"] .lattice-tools {
+    --wall-tools-panel-width: min(460px, calc(100vw - 32px));
+    --wall-tools-top-reserve: 24px;
+}
+
+html[data-runtime="capacitor-android"] .lattice-tools-stack {
+    min-height: 0;
+}
+
+html[data-runtime="capacitor-android"] .lattice-tools-panel {
+    flex: 0 1 auto;
+    min-height: 0;
+    gap: 8px;
+    padding: 16px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    scrollbar-width: thin;
+}
+
+html[data-runtime="capacitor-android"] .lattice-tools-panel > * { flex-shrink: 0; }
+html[data-runtime="capacitor-android"] .lattice-tools-quick {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-bottom: 4px;
+}
+html[data-runtime="capacitor-android"] .lattice-tools-quick-action {
+    min-height: 76px;
+    height: auto;
+    gap: 6px;
+    padding: 10px 6px;
+    align-content: center;
+}
+html[data-runtime="capacitor-android"] .lattice-tools-quick-label {
+    display: block;
+    max-width: 100%;
+    font-size: 13px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+html[data-runtime="capacitor-android"] .lattice-tools-action {
+    min-height: 58px;
+    gap: 14px;
+    padding: 10px 12px;
+    font-size: 17px;
+    line-height: 1.4;
+}
+html[data-runtime="capacitor-android"] .lattice-tools-action > span:not(.lattice-tools-toggle):not(.lattice-tools-value) {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+html[data-runtime="capacitor-android"] .lattice-tools-value { flex: none; font-size: 15px; }
+html[data-runtime="capacitor-android"] .lattice-tools-quick-action svg,
+html[data-runtime="capacitor-android"] .lattice-tools-action svg,
+html[data-runtime="capacitor-android"] .lattice-tools-slider-icon svg { width: 24px; height: 24px; }
+html[data-runtime="capacitor-android"] .lattice-tools-toggle { flex: none; width: 42px; height: 26px; padding: 3px; }
+html[data-runtime="capacitor-android"] .lattice-tools-toggle > span { width: 18px; height: 18px; }
+html[data-runtime="capacitor-android"] .lattice-tools-toggle.is-on > span { transform: translateX(16px); }
+html[data-runtime="capacitor-android"] .lattice-tools-slider { min-height: 60px; gap: 12px; padding-right: 14px; }
+html[data-runtime="capacitor-android"] .lattice-tools-slider-icon { width: 48px; height: 48px; }
+html[data-runtime="capacitor-android"] .lattice-tools-slider input[type="range"] { height: 48px; touch-action: none; }
+html[data-runtime="capacitor-android"] .lattice-tools-slider input[type="range"]::-webkit-slider-runnable-track { height: 6px; }
+html[data-runtime="capacitor-android"] .lattice-tools-slider input[type="range"]::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -9px; }
+html[data-runtime="capacitor-android"] .lattice-tools-slider-value { width: 46px; font-size: 16px; }
+html[data-runtime="capacitor-android"] .lattice-tools-heading { padding-top: 14px; padding-bottom: 4px; font-size: 13px; }
+html[data-runtime="capacitor-android"] .lattice-tools-lights-toggle { min-height: 48px; }
+html[data-runtime="capacitor-android"] .lattice-tools-lights-toggle span { min-width: 64px; padding: 8px 12px; font-size: 15px; align-content: center; }
+html[data-runtime="capacitor-android"] .lattice-tools-help-trigger { width: 48px; min-height: 48px; padding: 0; }
+html[data-runtime="capacitor-android"] .lattice-tools-help li { min-height: 44px; font-size: 15px; }
+html[data-runtime="capacitor-android"] .lattice-tools-stack .lattice-tools-panel.has-quick-actions .lattice-tools-help ul { max-height: none; overflow: visible; }
+html[data-runtime="capacitor-android"] .lattice-tools-island { min-height: 88px; }

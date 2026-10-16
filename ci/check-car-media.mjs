@@ -83,6 +83,7 @@ try {
         adb('shell','cmd','media_session','dispatch','play');await delay(1500);
         report.systemPlay=await waitForAudio(false);
         report.transportDiagnostics=await evaluate("window.Capacitor.nativePromise('CarMedia','diagnostics',{})");
+        if (!report.transportDiagnostics.controllerEvidence?.remoteCommands?.length) throw new Error('Missing controller receipt evidence');
         report.nativeCommands=await evaluate('window.__carNativeCommands');
         if(!report.systemPause || !report.systemPlay)throw new Error('System controller did not pause/resume the app audio');
         for(const command of ['next','previous']){adb('shell','cmd','media_session','dispatch',command);await delay(1200);}
