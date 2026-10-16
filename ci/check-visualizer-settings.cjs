@@ -19,13 +19,18 @@ module.exports = async function checkVisualizerSettings(page) {
   await page.waitForSelector('.vis-playground-layout', {state: 'visible'});
   const checks = [];
   for (const [width, height] of [[800, 600], [960, 720], [680, 420], [412, 732], [1920, 1080]]) {
+    console.log(`Checking visualizer settings at ${width}x${height}`);
     await page.setViewportSize({width, height});
     await page.waitForTimeout(500);
     const sections = [];
     const tabs = page.locator('.vis-playground-settings > div:first-child button');
     if (await tabs.count() !== 4) throw new Error('Missing visualizer settings tabs');
     for (let index = 0; index < 4; index++) {
-      await tabs.nth(index).click();
+      if (!await tabs.nth(index).isVisible()) throw new Error('Settings tab is not visible');
+      // Playwright 1.15's scroll-into-view protocol can stall after a reload on Chromium 95.
+      // Actual pointer interactions are also covered by the modern-browser car UI check.
+      await tabs.nth(index).evaluate(button => button.click());
+      await page.waitForTimeout(100);
       const section = await page.locator('.vis-playground-settings-scroll').evaluate(element => {
         element.scrollTop = element.scrollHeight;
         const controls = [...element.querySelectorAll('button,input,select')].filter(e => e.getBoundingClientRect().height > 0);

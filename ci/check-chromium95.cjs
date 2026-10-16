@@ -2,12 +2,14 @@ const { chromium } = require(process.env.FOLIA_LEGACY_PLAYWRIGHT);
 const fs = require('node:fs');
 
 // Exercise the compiled UI in a real Chromium 95 process; a user-agent override is insufficient.
+const deadline = setTimeout(() => { console.error('Chromium 95 check exceeded three minutes'); process.exit(1); }, 180000);
 (async () => {
   fs.mkdirSync('artifacts/chromium95', {recursive: true});
   const browser = await chromium.launch({executablePath: process.env.FOLIA_CHROMIUM_EXECUTABLE, headless: true, args: ['--no-sandbox']});
   const version = browser.version();
   if (!version.startsWith('95.')) throw new Error(`Expected Chromium 95, got ${version}`);
   const page = await browser.newPage({viewport: {width: 1920, height: 1080}, locale: 'en-US'});
+  page.setDefaultTimeout(15000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:4173/', {waitUntil: 'domcontentloaded'});
@@ -62,4 +64,5 @@ const fs = require('node:fs');
   await page.screenshot({path: 'artifacts/chromium95/login-unconfigured.png'});
   if (errors.length) throw new Error(errors.join(';'));
   await browser.close();
+  clearTimeout(deadline);
 })().catch(error => { console.error(error); process.exit(1); });

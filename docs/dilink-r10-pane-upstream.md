@@ -22,4 +22,4 @@ R9 的多窗口分支明确 show(systemBars)。R10 取消这一恢复行为，�
 
 [Sonnet README](https://github.com/chthollyphile/folia-sonnet) 明确声明：实验 Android 打包示范，基于 Major 0.6.7，不再维护同步主仓库。我们的固定基线为5a2c3148cc78c51a5c2df15d7d0d34c120c24873，后来加入 DiLink 适配与 QQ 等功能。两者有同源关系，但现为分别维护的仓库，车机版并非实时跟随 Major。
 
-截至2026-10-16，[Major最新正式版0.7.20](https://github.com/chthollyphile/folia-major/releases/tag/v0.7.20)，源码1b39fd868e2ddda95788f1baa839c032f3e7a285。对比 src/components/visualizer/*/entry.tsx，Major14个内置模式、当前车机10个；新版新增 lumiere（绘光）、sonnet（商籁）、still、tempera。另有 [Folium桌面模组](https://github.com/chthollyphile/folia-major/blob/main/mods/README.md)，与内置模式是两类。R8 原生播放器尚无 FFT 接入，部分频谱响应不足也不同于模式缺失。没有将新版桌面模组或整个新版主项目未经适配直接替换到车机包中。
+截至2026-10-16，[Major最新正式版0.7.20](https://github.com/chthollyphile/folia-major/releases/tag/v0.7.20)，源码1b39fd868e2ddda95788f1baa839c032f3e7a285。对比 src/components/visualizer/*/entry.tsx，Major14个内置模式、当前车机10个；新版新增 lumiere（绘光）、sonnet（商籁）、still（静止）、tempera（凝彩）。另有 [Folium桌面模组](https://github.com/chthollyphile/folia-major/blob/main/mods/README.md)，与内置模式是两类。R8 原生播放器尚无 FFT 接入，部分频谱响应不足也不同于模式缺失。没有将新版桌面模组或整个新版主项目未经适配直接替换到车机包中。
