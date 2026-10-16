@@ -17,6 +17,9 @@ module.exports = async function checkVisualizerSettings(page) {
   await page.waitForSelector('button:has-text("Visualizer settings")', {state: 'visible'});
   await command.evaluate(button => button.click());
   await page.waitForSelector('.vis-playground-layout', {state: 'visible'});
+  // Freeze the preview clock using its actual control while inspecting scrolling and geometry.
+  await page.locator('button[title="Pause preview"]').evaluate(button => button.click());
+  await page.waitForSelector('button[title="Resume preview"]', {state: 'visible'});
   const checks = [];
   for (const [width, height] of [[800, 600], [960, 720], [680, 420], [412, 732], [1920, 1080]]) {
     console.log(`Checking visualizer settings at ${width}x${height}`);

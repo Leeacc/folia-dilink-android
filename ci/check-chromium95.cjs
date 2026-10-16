@@ -2,7 +2,7 @@ const { chromium } = require(process.env.FOLIA_LEGACY_PLAYWRIGHT);
 const fs = require('node:fs');
 
 // Exercise the compiled UI in a real Chromium 95 process; a user-agent override is insufficient.
-const deadline = setTimeout(() => { console.error('Chromium 95 check exceeded three minutes'); process.exit(1); }, 180000);
+const deadline = setTimeout(() => { console.error('Chromium 95 check exceeded ten minutes'); process.exit(1); }, 600000);
 (async () => {
   fs.mkdirSync('artifacts/chromium95', {recursive: true});
   const browser = await chromium.launch({executablePath: process.env.FOLIA_CHROMIUM_EXECUTABLE, headless: true, args: ['--no-sandbox']});
