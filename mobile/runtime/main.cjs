@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { serveQq, requestQq } = require('./qqBridge.cjs');
+const { createPrivateStorage } = require('./privateStorage.cjs');
 const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
 
 require('./compat.cjs').installUtf8DecoderCompat();
@@ -28,6 +29,8 @@ const sessionFile = path.join(stateDir, 'kugou-session.json');
 let session = {};
 try { session = JSON.parse(fs.readFileSync(sessionFile, 'utf8')); } catch {}
 const kugou = createKugouApiBridge({
+  safeStorage: createPrivateStorage(stateDir),
+  platform: 'android',
   store: { get: key => session[key], set: (key, value) => {
     session[key] = value;
     fs.writeFileSync(sessionFile + '.tmp', JSON.stringify(session), { mode: 0o600 });
@@ -85,7 +88,7 @@ const server = http.createServer(async (req, res) => {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;
     if (body) res.end(JSON.stringify({ data: body }));
-    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64), frames: String(error?.stack || '').split('\n').slice(1,7).map(line => line.match(/([A-Za-z0-9_.-]+\.[cm]?js):(\d+):(\d+)/)?.[0]).filter(Boolean)} })); }
+    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64), upstreamCode: error?.errorCode, httpStatus: error?.status, detail: error?.name === 'KuGouApiError' ? String(error.message).replace(/https?:\S+/g, '[url]').replace(/[A-Za-z0-9_-]{24,}/g,'[redacted]').slice(0,200) : undefined, frames: String(error?.stack || '').split('\n').slice(1,7).map(line => line.match(/([A-Za-z0-9_.-]+\.[cm]?js):(\d+):(\d+)/)?.[0]).filter(Boolean)} })); }
   }
 });
 server.listen(0, '127.0.0.1', () => {

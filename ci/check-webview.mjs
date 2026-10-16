@@ -92,7 +92,7 @@ if (webViewMajor >= 95) {
           if (source) break;
           await delay(1500);
         }
-        if (!source) { checked.code = body?.code ?? body?.status; checked.diagnostic = body?.diagnostic; checked.frames = body?.frames; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
+        if (!source) { checked.code = body?.code ?? body?.status; checked.diagnostic = body?.diagnostic; checked.frames = body?.frames; checked.detail = body?.detail; checked.upstreamCode = body?.upstreamCode; checked.httpStatus = body?.httpStatus; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
         if (provider === 'kugou') sessionStorage.setItem('ci-public-kugou-preview', JSON.stringify({source,at:Date.now()}));
         checked.scheme = new URL(source).protocol;
         audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);

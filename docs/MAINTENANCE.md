@@ -33,3 +33,5 @@ BYD support: retain the application-level integer `BYD_SUPPORT_SPLIT_ACTIVITY=1`
 Node.js Mobile has no ICU. `mobile/runtime/compat.cjs` supplies strict UTF-8 decoding only when the native fatal decoder reports ERR_NO_ICU; malformed UTF-8 remains rejected. Unit tests cover Chinese, emoji, split sequences, byte offsets and BOM handling.
 
 For diagnosis, workflow_dispatch `apk_run_id` + `runtime_probe=true` installs an existing debug APK in a disposable emulator and overlays current backend JS. Its report explicitly records the runtime source revision and is **not release verification**. Publication is disabled in that mode. A fix must still be rebuilt into an APK and pass normal tests before release.
+
+KuGou's desktop `safeStorage` contract is supplied by the Android private-file adapter: AES-256-GCM, a separate key file with mode 0600 inside the app sandbox, and authenticated ciphertext. This is Android app-private persistence, not a claim of hardware-backed key storage. Plaintext legacy sessions are migrated by the upstream bridge; login no longer depends on an Electron keychain.
