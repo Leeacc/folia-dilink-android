@@ -4,6 +4,8 @@ const http = require('node:http');
 const { serveQq, requestQq } = require('./qqBridge.cjs');
 const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
 
+require('./compat.cjs').installUtf8DecoderCompat();
+
 // Embedded desktop music adapters. Only the private native bridge can access this loopback endpoint.
 const stateDir = process.argv[2];
 const secret = process.argv[3];
@@ -83,7 +85,7 @@ const server = http.createServer(async (req, res) => {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;
     if (body) res.end(JSON.stringify({ data: body }));
-    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64)} })); }
+    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64), frames: String(error?.stack || '').split('\n').slice(1,7).map(line => line.match(/([A-Za-z0-9_.-]+\.[cm]?js):(\d+):(\d+)/)?.[0]).filter(Boolean)} })); }
   }
 });
 server.listen(0, '127.0.0.1', () => {

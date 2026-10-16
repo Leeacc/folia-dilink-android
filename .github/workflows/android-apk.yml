@@ -11,18 +11,24 @@ on:
         required: false
         type: string
 
+      runtime_probe:
+        description: 'Diagnostic only: overlay current JS music runtime in a disposable debug emulator; never publish'
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.ref }}-${{ inputs.apk_run_id && 'verify' || 'build' }}
   cancel-in-progress: true
 
 jobs:
   build:
     if: ${{ !inputs.apk_run_id }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -53,7 +59,7 @@ jobs:
           npm run typecheck
           npm run test:unit
       - name: Test QQ search protocol regression
-        run: node --test ci/test-qq-search.cjs ci/test-qq-rpc.cjs
+        run: node --test ci/test-qq-search.cjs ci/test-qq-rpc.cjs ci/test-mobile-compat.cjs
       - name: Test native audio media-element boundary
         run: npm run test:unit -- test/unit/platform/nativeAudio.test.ts
       - name: Build and sync original Folia UI
@@ -127,12 +133,12 @@ jobs:
   smoke-test:
     if: ${{ always() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.apk_run_id != '')) }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        api: [29, 35]
+        api: ${{ fromJSON(inputs.runtime_probe && '[35]' || '[29,35]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -150,6 +156,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Install and inspect landscape UI
+        env:
+          FOLIA_RUNTIME_PROBE: ${{ inputs.runtime_probe && '1' || '0' }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -168,9 +176,9 @@ jobs:
           retention-days: 30
 
   publish:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.runtime_probe }}
     needs: [build, smoke-test]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

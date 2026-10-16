@@ -17,6 +17,12 @@ adb shell settings put secure immersive_mode_confirmations confirmed
 adb logcat -c
 adb shell am start -W -n io.github.leeacc.folia.dilink/top.izuna.foliamajor.MainActivity
 sleep 25
+if [ "${FOLIA_RUNTIME_PROBE:-0}" = 1 ]; then
+    python3 ci/apply-runtime-probe.py
+    adb logcat -c
+    adb shell am start -W -n io.github.leeacc.folia.dilink/top.izuna.foliamajor.MainActivity
+    sleep 15
+fi
 app_pid=$(adb shell pidof io.github.leeacc.folia.dilink | tr -d '\r')
 test -n "$app_pid"
 adb shell dumpsys activity activities > artifacts/activity.txt

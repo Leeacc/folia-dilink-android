@@ -27,3 +27,9 @@ All 14 built-in visualizers and 6 background categories remain registered. Optio
 The native spectrum uses Android Visualizer on Folia's nonzero session only. It is opt-in with Android RECORD_AUDIO permission; no microphone AudioRecord is created. Denial/unavailable OEM audio effect does not fail playback. Native events update MotionValues directly at 20 Hz and stop when hidden. General timed animation remains available without a spectrum.
 
 BYD support: retain the application-level integer `BYD_SUPPORT_SPLIT_ACTIVITY=1`, resizable activity and no fixed orientation. Insets protect controls. Transparent app system bars are a request, not authority over the OEM caption. Do not spoof another media package, guess protected Binder transactions or copy a proprietary OEM SDK. Home-card producer integration remains an open real-device issue.
+
+## Runtime diagnostics
+
+Node.js Mobile has no ICU. `mobile/runtime/compat.cjs` supplies strict UTF-8 decoding only when the native fatal decoder reports ERR_NO_ICU; malformed UTF-8 remains rejected. Unit tests cover Chinese, emoji, split sequences, byte offsets and BOM handling.
+
+For diagnosis, workflow_dispatch `apk_run_id` + `runtime_probe=true` installs an existing debug APK in a disposable emulator and overlays current backend JS. Its report explicitly records the runtime source revision and is **not release verification**. Publication is disabled in that mode. A fix must still be rebuilt into an APK and pass normal tests before release.
