@@ -16,8 +16,16 @@ final class CarControllerEvidence {
         if (browsers.size() > 8) browsers.remove(browsers.iterator().next());
     }
     static synchronized void command(String packageName, String action) {
-        commands.addLast(new JSObject().put("package", packageName).put("action", action)
-            .put("elapsedMs", SystemClock.elapsedRealtime()));
+        append(new JSObject().put("source", "media_session").put("package", packageName).put("action", action));
+    }
+    static synchronized void key(int code) {
+        append(new JSObject().put("source", "key_event").put("action", "media_key").put("keyCode", code));
+    }
+    static synchronized void serviceIntent(String action) {
+        append(new JSObject().put("source", "service_intent").put("action", action == null ? "unknown" : action.substring(0, Math.min(32, action.length()))));
+    }
+    private static void append(JSObject entry) {
+        commands.addLast(entry.put("elapsedMs", SystemClock.elapsedRealtime()));
         if (commands.size() > 8) commands.removeFirst();
     }
     static synchronized JSObject snapshot() {

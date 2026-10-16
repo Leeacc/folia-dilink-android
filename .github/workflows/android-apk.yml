@@ -59,7 +59,7 @@ jobs:
           npm run typecheck
           npm run test:unit
       - name: Test QQ search protocol regression
-        run: node --test ci/test-qq-search.cjs ci/test-qq-rpc.cjs ci/test-mobile-compat.cjs ci/test-private-storage.cjs
+        run: node --test ci/test-qq-search.cjs ci/test-qq-rpc.cjs ci/test-mobile-compat.cjs ci/test-private-storage.cjs ci/test-css-bundle.cjs
       - name: Test native audio media-element boundary
         run: npm run test:unit -- test/unit/platform/nativeAudio.test.ts
       - name: Build and sync original Folia UI

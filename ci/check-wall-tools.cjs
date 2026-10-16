@@ -20,6 +20,22 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
         await page.goto(base, {waitUntil: 'domcontentloaded'});
         await page.waitForSelector('.lattice-tools', {timeout: 60000});
         if (!(await page.title()).includes('Folia')) throw new Error('Unexpected page identity');
+        const transforms = await page.evaluate(() => {
+            const parent = document.createElement('div');
+            const child = document.createElement('div');
+            parent.className = '-translate-x-1/2';
+            parent.style.cssText = 'position:absolute;left:-10000px;width:100px;height:100px';
+            child.className = 'rotate-180';
+            child.style.cssText = 'width:20px;height:20px';
+            parent.append(child); document.body.append(parent);
+            try {
+                const outer = getComputedStyle(parent).transform, inner = getComputedStyle(child).transform;
+                return {outer,inner,x:new DOMMatrixReadOnly(outer).m41,childX:new DOMMatrixReadOnly(inner).m41};
+            } finally { parent.remove(); }
+        });
+        if (Math.abs(transforms.x + 50) > 1 || transforms.inner === 'none' || Math.abs(transforms.childX) > 1) {
+            throw new Error('Utility transform cascade/inheritance regression: '+JSON.stringify(transforms));
+        }
         await page.evaluate(() => document.documentElement.dataset.runtime = 'capacitor-android');
         await click(page.locator('.lattice-tools button').first());
         await page.waitForSelector('.lattice-tools-panel', {state: 'visible'});
@@ -56,7 +72,7 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
             await page.screenshot({path:`${output}/wall-tools-${width}x${height}.png`});
             await click(panel.locator('.lattice-tools-help-trigger'));
             await page.waitForFunction(() => document.querySelector('.lattice-tools-help-trigger')?.getAttribute('aria-expanded') === 'true', null, {timeout:5000});
-            await page.waitForTimeout(220);
+            await page.waitForSelector('.lattice-tools-help', {state:'visible',timeout:5000});
             const help = panel.locator('.lattice-tools-help');
             if (!(await help.isVisible())) throw new Error('Help could not be reached');
             await panel.evaluate(element => element.scrollTop = element.scrollHeight);

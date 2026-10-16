@@ -214,7 +214,7 @@ export default async function viteConfig(_config: ConfigEnv): Promise<UserConfig
       include: ['music-metadata'],
     },
     build: {
-      ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? { target: 'chrome95', cssTarget: 'chrome95', cssCodeSplit: false } : {}),
+      ...(process.env.FOLIA_BUILD_TARGET === 'capacitor' ? { target: 'chrome95', cssTarget: 'chrome95' } : {}),
       rollupOptions: {
         input: {
           main: 'index.html',

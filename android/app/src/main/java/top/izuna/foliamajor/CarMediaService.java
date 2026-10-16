@@ -55,6 +55,7 @@ public class CarMediaService extends MediaBrowserService {
         long now = SystemClock.elapsedRealtime();
         if (code == lastKeyCode && now - lastKeyAt < 160) return true;
         lastKeyCode = code; lastKeyAt = now;
+        CarControllerEvidence.key(code);
         if (byd && (code == 353 || code == KeyEvent.KEYCODE_MEDIA_PLAY || code == KeyEvent.KEYCODE_MEDIA_PAUSE)) {
             command(instance.playing ? "pause" : "play", 0); return true;
         }
@@ -118,7 +119,10 @@ public class CarMediaService extends MediaBrowserService {
     }
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) { stopSelf(); return START_NOT_STICKY; }
-        if (intent.hasExtra("command")) { command(intent.getStringExtra("command"), 0); return START_NOT_STICKY; }
+        if (intent.hasExtra("command")) {
+            CarControllerEvidence.serviceIntent(intent.getStringExtra("command"));
+            command(intent.getStringExtra("command"), 0); return START_NOT_STICKY;
+        }
         boolean wasPlaying = playing;
         playing = intent.getBooleanExtra("playing", false);
         position = Math.max(0, intent.getLongExtra("position", 0));

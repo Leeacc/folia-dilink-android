@@ -46,7 +46,12 @@ module.exports = async function checkVisualizerSettings(page) {
       });
       if (section.height < 140 || section.bottom > height + 1
           || (section.lastControl && (section.lastControl.top < 0 || section.lastControl.bottom > height + 1))) {
-        throw new Error(`Settings cannot be reached: ${JSON.stringify({width, height, index, section})}`);
+        const layout = await page.locator('.vis-playground-layout').evaluate(element => ({
+          rows:getComputedStyle(element).gridTemplateRows, columns:getComputedStyle(element).gridTemplateColumns,
+          bounds:element.getBoundingClientRect().toJSON(),
+        }));
+        await page.screenshot({path:`artifacts/chromium95/settings-failed-${width}x${height}.png`});
+        throw new Error(`Settings cannot be reached: ${JSON.stringify({width, height, index, section, layout})}`);
       }
       sections.push(section);
     }

@@ -20,4 +20,18 @@
         padding: 12px;
         gap: 12px;
     }
+    /* Fixed tab columns prevent font-dependent four-row wrapping from consuming the settings pane. */
+    .vis-playground-settings > div:first-child {
+        display: grid;
+        width: 100%;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        border-radius: 20px;
+    }
+    .vis-playground-settings > div:first-child button {
+        min-width: 0;
+        min-height: 44px;
+        padding: 7px 8px;
+        font-size: 13px;
+        line-height: 1.35;
+    }
 }
