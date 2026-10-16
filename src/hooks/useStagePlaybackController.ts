@@ -37,50 +37,31 @@ import type {
     StageLyricsClockState,
     WindowPlaybackHandoff,
 } from '../types/appPlayback';
+import { setStatusMessage as setStatusMsg } from '../stores/useStatusMessageStore';
+import { setActivePlaybackContext, setAudioSrc, setCachedCoverUrl, setCurrentLineIndex, setCurrentSong, setDuration, setIsFmMode, setPlayQueue, setPlayerState } from '../stores/usePlaybackStore';
+import { useStableActionSurface } from './useStableCallbacks';
+import { useTranslation } from 'react-i18next';
+import { usePlaybackStore } from '../stores/usePlaybackStore';
+import { useStageSettingsStore } from '../stores/useStageSettingsStore';
+import { currentTime } from '../stores/motionSignals';
 
 // src/hooks/useStagePlaybackController.ts
 
 type SetState<T> = Dispatch<SetStateAction<T>>;
 
 type UseStagePlaybackControllerParams = {
-    t: (key: string) => string;
     isDev: boolean;
     isElectronWindow: boolean;
-    enableNowPlayingStage: boolean;
-    enablePlayerCapStage: boolean;
-    playerCapHost: string;
-    playerCapPlayer: string;
-    playerCapTimeBasis: 'timestamp' | 'play_time';
-    playerCapSticky: boolean;
-    activePlaybackContext: 'main' | 'stage';
-    setActivePlaybackContext: SetState<'main' | 'stage'>;
-    currentSong: SongResult | null;
-    lyrics: LyricData | null;
-    cachedCoverUrl: string | null;
-    audioSrc: string | null;
-    playQueue: SongResult[];
-    isFmMode: boolean;
-    playerState: PlayerState;
-    duration: number;
-    currentLineIndex: number;
-    currentTime: MotionValue<number>;
     audioRef: RefObject<HTMLAudioElement | null>;
     currentSongRef: MutableRefObject<string | number | null>;
+    /** Bumped when a snapshot commits its song, so work started for an earlier playback of that song reads as stale. */
+    playbackGenerationRef: MutableRefObject<number>;
     shouldAutoPlayRef: MutableRefObject<boolean>;
     pendingResumeTimeRef: MutableRefObject<number | null>;
     lastAudioRecoverySourceRef: MutableRefObject<string | null>;
     currentOnlineAudioUrlFetchedAtRef: MutableRefObject<number | null>;
-    setCurrentSong: SetState<SongResult | null>;
     setLyrics: (nextLyrics: LyricData | null) => void;
-    setCachedCoverUrl: SetState<string | null>;
-    setAudioSrc: SetState<string | null>;
-    setPlayQueue: SetState<SongResult[]>;
-    setIsFmMode: SetState<boolean>;
     setIsLyricsLoading: SetState<boolean>;
-    setPlayerState: SetState<PlayerState>;
-    setCurrentLineIndex: SetState<number>;
-    setDuration: SetState<number>;
-    setStatusMsg: SetState<StatusMessage | null>;
     navigateToPlayer: () => void;
 };
 
@@ -105,46 +86,38 @@ const EMPTY_STAGE_ENTRY_KEY = '__empty-stage-entry__';
 
 // Keeps Stage / Now Playing state isolated from the main player snapshot.
 export function useStagePlaybackController({
-    t,
     isDev,
     isElectronWindow,
-    enableNowPlayingStage,
-    enablePlayerCapStage,
-    playerCapHost,
-    playerCapPlayer,
-    playerCapTimeBasis,
-    playerCapSticky,
-    activePlaybackContext,
-    setActivePlaybackContext,
-    currentSong,
-    lyrics,
-    cachedCoverUrl,
-    audioSrc,
-    playQueue,
-    isFmMode,
-    playerState,
-    duration,
-    currentLineIndex,
-    currentTime,
     audioRef,
     currentSongRef,
+    playbackGenerationRef,
     shouldAutoPlayRef,
     pendingResumeTimeRef,
     lastAudioRecoverySourceRef,
     currentOnlineAudioUrlFetchedAtRef,
-    setCurrentSong,
     setLyrics,
-    setCachedCoverUrl,
-    setAudioSrc,
-    setPlayQueue,
-    setIsFmMode,
     setIsLyricsLoading,
-    setPlayerState,
-    setCurrentLineIndex,
-    setDuration,
-    setStatusMsg,
     navigateToPlayer,
 }: UseStagePlaybackControllerParams) {
+    // Read here rather than passed in: all store fields, a module-level motion signal, or i18n.
+    const { t } = useTranslation();
+    const enableNowPlayingStage = useStageSettingsStore(state => state.enableNowPlayingStage);
+    const enablePlayerCapStage = useStageSettingsStore(state => state.enablePlayerCapStage);
+    const playerCapHost = useStageSettingsStore(state => state.playerCapHost);
+    const playerCapPlayer = useStageSettingsStore(state => state.playerCapPlayer);
+    const playerCapTimeBasis = useStageSettingsStore(state => state.playerCapTimeBasis);
+    const playerCapSticky = useStageSettingsStore(state => state.playerCapSticky);
+    const activePlaybackContext = usePlaybackStore(state => state.activePlaybackContext);
+    const currentSong = usePlaybackStore(state => state.currentSong);
+    const lyrics = usePlaybackStore(state => state.lyrics);
+    const cachedCoverUrl = usePlaybackStore(state => state.cachedCoverUrl);
+    const audioSrc = usePlaybackStore(state => state.audioSrc);
+    const playQueue = usePlaybackStore(state => state.playQueue);
+    const isFmMode = usePlaybackStore(state => state.isFmMode);
+    const playerState = usePlaybackStore(state => state.playerState);
+    const duration = usePlaybackStore(state => state.duration);
+    const currentLineIndex = usePlaybackStore(state => state.currentLineIndex);
+
     const [stageStatus, setStageStatus] = useState<StageStatus | null>(null);
     const [nowPlayingConnectionStatus, setNowPlayingConnectionStatus] = useState<NowPlayingConnectionStatus>('disabled');
     const [nowPlayingTrack, setNowPlayingTrack] = useState<NowPlayingTrackSnapshot | null>(null);
@@ -242,6 +215,12 @@ export function useStagePlaybackController({
         shouldAutoPlayRef.current = snapshot?.playerState === PlayerState.PLAYING;
         lastAudioRecoverySourceRef.current = null;
         currentOnlineAudioUrlFetchedAtRef.current = null;
+        // Applying a snapshot commits to its song the way playSong does. Left on the Stage song's key,
+        // recovery and failure handling would read the restored song as already replaced and drop its
+        // refresh or failure message as stale.
+        currentSongRef.current = snapshot?.currentSong ? getPlaybackSongKey(snapshot.currentSong) : null;
+        // A new playback even when it is the song a refresh was started for before Stage opened: that refresh is now stale.
+        playbackGenerationRef.current += 1;
         setCurrentSong(snapshot?.currentSong ?? null);
         setLyrics(snapshot?.lyrics ?? null);
         setCachedCoverUrl(snapshot?.cachedCoverUrl ?? null);
@@ -255,9 +234,11 @@ export function useStagePlaybackController({
         setDuration(snapshot?.duration ?? 0);
     }, [
         currentOnlineAudioUrlFetchedAtRef,
+        currentSongRef,
         currentTime,
         lastAudioRecoverySourceRef,
         pendingResumeTimeRef,
+        playbackGenerationRef,
         setAudioSrc,
         setCachedCoverUrl,
         setCurrentLineIndex,
@@ -1403,7 +1384,10 @@ export function useStagePlaybackController({
         clearMainPlaybackContext();
     }, [activePlaybackContext, clearMainPlaybackContext, setActivePlaybackContext, stageSource]);
 
-    return {
+    // Wrapped so the callbacks this hook hands back keep one identity for the app's lifetime. They
+    // are all invoked from events or effects, and their churn was what kept every build*Model memo
+    // in App.tsx from ever holding - see useStableCallbacks.ts.
+    return useStableActionSurface({
         stageStatus,
         setStageStatus,
         stageSource,
@@ -1436,5 +1420,5 @@ export function useStagePlaybackController({
         leaveStagePlayback,
         interruptStagePlaybackForMainTransition,
         clearStagePlaybackSession,
-    };
+    });
 }

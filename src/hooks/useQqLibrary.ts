@@ -65,7 +65,7 @@ export const refreshQqLibraryAccount = async ({
     const user = await checkLoginStatus();
     if (!user) return false;
 
-    // Upstream may return a profile without a nickname; the provider owns the login signal.
+    // The acceptance test account has an empty upstream nickname, so the returned profile is the entire login signal.
     console.info('[QQLibrary] refresh:authenticated', {
         hasUserId: Boolean(user.id),
         hasNickname: Boolean(user.nickname),
@@ -132,28 +132,28 @@ export const refreshQqLibraryAccount = async ({
 };
 
 export const useQqLibrary = () => {
-    const updateAccount = useOnlineProviderAccountStore((state) => state.updateAccount);
-    const clearAccount = useOnlineProviderAccountStore((state) => state.clearAccount);
+    const updateAccount = useOnlineProviderAccountStore(state => state.updateAccount);
+    const clearAccount = useOnlineProviderAccountStore(state => state.clearAccount);
 
     // Clears the visible account first so a failed backend logout cannot leave stale authenticated UI behind.
-    const clearAuthState = useCallback(
-        async (error?: string) => {
-            clearAccount('qq', error);
-            console.info('[QQLibrary] auth-state-cleared', {
-                reason: error || 'manual-logout',
+    const clearAuthState = useCallback(async (error?: string) => {
+        clearAccount('qq', error);
+        console.info('[QQLibrary] auth-state-cleared', {
+            reason: error || 'manual-logout',
+        });
+        const cleanupResults = await Promise.allSettled([
+            omni.logout('qq'),
+            clearProviderAccountSnapshot('qq'),
+        ]);
+        cleanupResults.forEach((result, index) => {
+            if (result.status === 'fulfilled') return;
+            console.warn('[QQLibrary] auth-cleanup:error', {
+                target: index === 0 ? 'provider-session' : 'account-snapshot',
+                name: result.reason instanceof Error ? result.reason.name : 'Error',
+                message: result.reason instanceof Error ? result.reason.message : String(result.reason),
             });
-            const cleanupResults = await Promise.allSettled([omni.logout('qq'), clearProviderAccountSnapshot('qq')]);
-            cleanupResults.forEach((result, index) => {
-                if (result.status === 'fulfilled') return;
-                console.warn('[QQLibrary] auth-cleanup:error', {
-                    target: index === 0 ? 'provider-session' : 'account-snapshot',
-                    name: result.reason instanceof Error ? result.reason.name : 'Error',
-                    message: result.reason instanceof Error ? result.reason.message : String(result.reason),
-                });
-            });
-        },
-        [clearAccount],
-    );
+        });
+    }, [clearAccount]);
 
     const checkLoginStatus = useCallback(async (): Promise<ProviderUser | null> => {
         const cachedAccount = useOnlineProviderAccountStore.getState().accounts.qq;
@@ -181,27 +181,23 @@ export const useQqLibrary = () => {
                 cachedUser: cachedAccount?.user,
                 fallbackMessage: 'qq_login_status_failed',
                 clearAuthState,
-                updateAccount: (patch) => updateAccount('qq', patch),
+                updateAccount: patch => updateAccount('qq', patch),
             });
         }
     }, [clearAuthState, updateAccount]);
 
-    const refresh = useCallback(
-        () =>
-            refreshQqLibraryAccount({
-                availability: omni.getProviderAvailability('qq'),
-                capabilities: omni.getProviderCapabilities('qq'),
-                cachedUser: useOnlineProviderAccountStore.getState().accounts.qq?.user || null,
-                checkLoginStatus,
-                loadLikedSongIds: (userId) => omni.getProviderLikedSongIds('qq', userId),
-                loadPlaylistPage: (userId, limit, offset) =>
-                    omni.getProviderUserPlaylists('qq', userId, { limit, offset }),
-                saveSnapshot: async (user, collections, likedSongIds) =>
-                    (await saveProviderAccountSnapshot('qq', { user, collections, likedSongIds })).savedAt,
-                updateAccount: (patch) => updateAccount('qq', patch),
-            }),
-        [checkLoginStatus, updateAccount],
-    );
+    const refresh = useCallback(() => refreshQqLibraryAccount({
+        availability: omni.getProviderAvailability('qq'),
+        capabilities: omni.getProviderCapabilities('qq'),
+        cachedUser: useOnlineProviderAccountStore.getState().accounts.qq?.user || null,
+        checkLoginStatus,
+        loadLikedSongIds: userId => omni.getProviderLikedSongIds('qq', userId),
+        loadPlaylistPage: (userId, limit, offset) => omni.getProviderUserPlaylists('qq', userId, { limit, offset }),
+        saveSnapshot: async (user, collections, likedSongIds) => (
+            (await saveProviderAccountSnapshot('qq', { user, collections, likedSongIds })).savedAt
+        ),
+        updateAccount: patch => updateAccount('qq', patch),
+    }), [checkLoginStatus, updateAccount]);
 
     const logout = useCallback(async () => {
         await clearAuthState();
@@ -216,7 +212,7 @@ export const useQqLibrary = () => {
                 const user = omni.normalizeCachedUser('qq', snapshot.user);
                 if (user) {
                     const collections = snapshot.collections
-                        .map((collection) => omni.normalizeCachedCollection('qq', collection, collection.type))
+                        .map(collection => omni.normalizeCachedCollection('qq', collection, collection.type))
                         .filter(Boolean) as ProviderCollection[];
                     updateAccount('qq', {
                         status: 'authenticated',
@@ -230,9 +226,7 @@ export const useQqLibrary = () => {
             }
             if (!cancelled) void refresh();
         })();
-        return () => {
-            cancelled = true;
-        };
+        return () => { cancelled = true; };
     }, [refresh]);
 
     return { refresh, logout, checkLoginStatus };

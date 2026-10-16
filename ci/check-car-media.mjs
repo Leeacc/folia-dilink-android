@@ -27,7 +27,7 @@ try {
             const db=await new Promise((resolve,reject)=>{const request=indexedDB.open('KineticPlayerDB');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
             const song={id:1909126284,name:'Folia Car Integration Test',artists:[{id:1,name:'Provider test stream'}],album:{id:1,name:'CI verification'},durationMs:120000,sourceRef:{kind:'online',providerId:'netease',mediaId:'1909126284'}};
             await new Promise((resolve,reject)=>{const tx=db.transaction('api_cache','readwrite');const store=tx.objectStore('api_cache');store.put({key:'last_song',data:song,timestamp:Date.now()});store.put({key:'last_queue',data:[song],timestamp:Date.now()});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
-            localStorage.setItem('visualizer_mode','fume');localStorage.setItem('auto_use_best_lyric','false');
+            localStorage.setItem('library_suite','bravais');localStorage.setItem('library_suite_prompt_seen','true');localStorage.setItem('playback_entry_view_chosen','true');localStorage.setItem('folia_last_seen_ponder_onboarding_version','0.7.20');localStorage.setItem('visualizer_mode','fume');localStorage.setItem('auto_use_best_lyric','false');
         })()`);
         await call('Page.reload');await delay(8000);
         await evaluate(`(async()=>{for(let i=0;i<60;i++){const audio=document.querySelector('audio');if(audio?.src && audio.readyState>=1)break;await new Promise(r=>setTimeout(r,500));}const audio=document.querySelector('audio');if(!audio?.src)throw new Error('App session did not restore audio');
@@ -48,6 +48,21 @@ try {
         const bars=report.nativeDiagnostics.windowBars;
         if(!bars || bars.statusColor!==0 || bars.navigationColor!==0 || bars.statusContrast || bars.navigationContrast)
             throw new Error('Application system-bar transparency request regressed');
+        // Grant this optional permission only inside the disposable emulator, never on a user's vehicle.
+        adb('shell','pm','grant','io.github.leeacc.folia.dilink','android.permission.RECORD_AUDIO');
+        report.spectrum=await evaluate(`(async()=>{
+            const samples=[];
+            const listener=window.Capacitor.nativeCallback('CarSpectrum','addListener',{eventName:'spectrum'},data=>{
+                if(samples.length<100)samples.push({sessionId:data.sessionId,max:Math.max(0,...data.bins)});
+            });
+            await window.Capacitor.nativePromise('CarSpectrum','configure',{enabled:true});
+            await new Promise(r=>setTimeout(r,2500));
+            await window.Capacitor.nativePromise('CarSpectrum','configure',{enabled:false});
+            void window.Capacitor.nativeCallback('CarSpectrum','removeListener',{eventName:'spectrum',callbackId:listener});
+            return {frames:samples.length,nonzero:samples.some(v=>v.max>0),sessionIds:[...new Set(samples.map(v=>v.sessionId))]};
+        })()`);
+        if(!report.spectrum.frames || !report.spectrum.nonzero || !report.spectrum.sessionIds.includes(native.sessionId))
+            throw new Error('Native playback spectrum did not reach the JS bridge');
         report.gainSteps=[];
         for(const value of [.01,.05,.2,.5,1]){
             await evaluate(`(async()=>{document.querySelector('audio').volume=${value};await new Promise(r=>setTimeout(r,400));})()`);

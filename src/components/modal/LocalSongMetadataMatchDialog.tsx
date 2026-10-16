@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, FileAudio, Loader2, Search, X } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { Check, FileAudio, Loader2, Piano, Search, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { LocalSong } from '../../types';
 import type { LocalLibraryAssignment } from '../../types/localLibrary';
-import { createSafeObjectUrl, isBlob } from '../../utils/blobGuards';
+import { getLocalCoverAssetUrl } from '../../services/localCoverAssetUrl';
 import { applyOnlineMetadataCandidate, useImportedSnapshotForLocalSong } from '../../services/localSongMetadataMatchService';
+import { setLocalSongPureMusicMark } from '../../services/localSongMatchSelectionService';
+import { setStatusMessage } from '../../stores/useStatusMessageStore';
 import {
     buildLocalSongMetadataSearchQuery,
     buildLocalSongMetadataSearchTarget,
@@ -13,6 +15,7 @@ import {
     type OnlineMetadataSource,
 } from '../../services/onlineMetadataSearchService';
 import { DurationMatchBadge } from './DurationMatchBadge';
+import { getSizedCoverUrl } from '../../utils/coverUrl';
 
 // src/components/modal/LocalSongMetadataMatchDialog.tsx
 // Lets the user search one provider and independently choose its metadata bundle and cover.
@@ -34,9 +37,10 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
     const [searching, setSearching] = useState(false);
     const [applying, setApplying] = useState(false);
     const [restoringLocalInfo, setRestoringLocalInfo] = useState(false);
+    const [markingPureMusic, setMarkingPureMusic] = useState(false);
     const [useOnlineMetadata, setUseOnlineMetadata] = useState(song.titleOrigin !== 'import');
-    const [useOnlineCover, setUseOnlineCover] = useState(song.useOnlineCover ?? !isBlob(song.embeddedCover));
-    const [embeddedCoverUrl, setEmbeddedCoverUrl] = useState<string | null>(null);
+    const [useOnlineCover, setUseOnlineCover] = useState(song.useOnlineCover ?? !song.localCoverAssetId);
+    const localCoverUrl = getLocalCoverAssetUrl(song.localCoverAssetId, 512);
     const requestIdRef = useRef(0);
     const target = useMemo(() => buildLocalSongMetadataSearchTarget(song), [song]);
     const currentTitle = song.title;
@@ -48,23 +52,12 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
         : song.importedMetadata.albumName) || t('localMusic.unknownAlbum');
     const currentCoverUrl = song.useOnlineCover && song.onlineMetadata?.coverUrl
         ? song.onlineMetadata.coverUrl
-        : embeddedCoverUrl;
+        : localCoverUrl;
     const selectedArtist = selected?.artists.map(artist => artist.name).join(', ') || '';
     const previewTitle = useOnlineMetadata && selected?.title ? selected.title : currentTitle;
     const previewArtist = useOnlineMetadata && selectedArtist ? selectedArtist : currentArtist;
     const previewAlbum = useOnlineMetadata && selected?.album?.name ? selected.album.name : currentAlbum;
     const previewCoverUrl = useOnlineCover && selected?.coverUrl ? selected.coverUrl : currentCoverUrl;
-
-    useEffect(() => {
-        if (!isBlob(song.embeddedCover)) {
-            setEmbeddedCoverUrl(null);
-            return;
-        }
-        const url = createSafeObjectUrl(song.embeddedCover);
-        if (!url) return;
-        setEmbeddedCoverUrl(url);
-        return () => URL.revokeObjectURL(url);
-    }, [song.embeddedCover]);
 
     const search = async () => {
         const safeQuery = query.trim();
@@ -118,6 +111,23 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
             setRestoringLocalInfo(false);
         }
     };
+    // 标记 / 取消纯音乐：只改歌词的自动匹配，元数据与封面不动；正在播放的这首由 onChanged 里的刷新就地换歌词。
+    const togglePureMusicMark = async () => {
+        const marked = !song.markedPureMusic;
+        setMarkingPureMusic(true);
+        try {
+            await setLocalSongPureMusicMark(song.id, marked);
+            await onChanged();
+            setStatusMessage({ type: 'success', text: t(marked ? 'status.markedPureMusic' : 'status.unmarkedPureMusic') });
+            onClose();
+        } catch (error) {
+            console.error('[LocalMusic] Failed to toggle the instrumental mark:', error);
+            setStatusMessage({ type: 'error', text: t('localMusic.pureMusicMarkFailed') });
+        } finally {
+            setMarkingPureMusic(false);
+        }
+    };
+    const busy = applying || restoringLocalInfo || markingPureMusic;
     const panelTheme = isDaylight ? 'border-black/10 bg-white text-zinc-900' : 'border-white/10 bg-zinc-950 text-white';
 
     return (
@@ -136,6 +146,11 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
                             {song.noAutoMatch && (
                                 <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
                                     {t('localMusic.localInfoBadge')}
+                                </span>
+                            )}
+                            {song.markedPureMusic && (
+                                <span className="shrink-0 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-bold text-violet-500">
+                                    {t('localMusic.statusPureMusic')}
                                 </span>
                             )}
                         </div>
@@ -185,7 +200,7 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
                                 <div className="mb-2 text-[11px] font-bold uppercase tracking-wider opacity-45">{t('localMusic.currentSongInfo')}</div>
                                 <div className="flex gap-3">
                                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-current/10">
-                                        {currentCoverUrl && <img src={currentCoverUrl} alt="" className="h-full w-full object-cover" />}
+                                        {currentCoverUrl && <img src={getSizedCoverUrl(currentCoverUrl, 512)} alt="" decoding="async" className="h-full w-full object-cover" />}
                                     </div>
                                     <div className="min-w-0 text-xs">
                                         <div className="truncate font-bold">{currentTitle}</div>
@@ -198,7 +213,7 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
                                 <div className="mb-2 text-[11px] font-bold uppercase tracking-wider text-blue-500">{t('localMusic.matchResultPreview')}</div>
                                 <div className="flex gap-3">
                                     <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-current/10">
-                                        {previewCoverUrl && <img src={previewCoverUrl} alt="" className="h-full w-full object-cover" />}
+                                        {previewCoverUrl && <img src={getSizedCoverUrl(previewCoverUrl, 512)} alt="" decoding="async" className="h-full w-full object-cover" />}
                                     </div>
                                     <div className="min-w-0 text-xs">
                                         <div className="truncate font-bold">{previewTitle}</div>
@@ -224,10 +239,23 @@ export const LocalSongMetadataMatchDialog = ({ song, assignment, isDaylight, onC
                         </div>
                     )}
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                        <button type="button" disabled={applying || restoringLocalInfo} onClick={() => void useLocalInfo()} className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-500 disabled:opacity-35">
-                            {restoringLocalInfo && <Loader2 size={15} className="animate-spin" />}{t('localMusic.dontUseOnlineMetadata')}
-                        </button>
-                        <button type="button" disabled={!selected || applying || restoringLocalInfo} onClick={() => void apply()} className="flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-bold text-white disabled:opacity-35">
+                        <div className="flex flex-wrap items-center gap-3">
+                            <button type="button" disabled={busy} onClick={() => void useLocalInfo()} className="flex items-center gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-bold text-amber-500 disabled:opacity-35">
+                                {restoringLocalInfo && <Loader2 size={15} className="animate-spin" />}{t('localMusic.dontUseOnlineMetadata')}
+                            </button>
+                            <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => void togglePureMusicMark()}
+                                aria-pressed={Boolean(song.markedPureMusic)}
+                                title={t('localMusic.markPureMusicHint')}
+                                className={`flex items-center gap-2 rounded-xl border border-violet-500/40 px-4 py-3 text-sm font-bold text-violet-500 disabled:opacity-35 ${song.markedPureMusic ? 'bg-violet-500/25' : 'bg-violet-500/10'}`}
+                            >
+                                {markingPureMusic ? <Loader2 size={15} className="animate-spin" /> : <Piano size={15} />}
+                                {t(song.markedPureMusic ? 'localMusic.unmarkPureMusic' : 'localMusic.markPureMusic')}
+                            </button>
+                        </div>
+                        <button type="button" disabled={!selected || busy} onClick={() => void apply()} className="ml-auto flex items-center justify-center gap-2 rounded-xl bg-blue-500 px-4 py-3 text-sm font-bold text-white disabled:opacity-35">
                             {applying && <Loader2 size={15} className="animate-spin" />}{t('localMusic.applyMetadataMatch')}
                         </button>
                     </div>

@@ -8,12 +8,14 @@ export type CarPreferences = {
     horizontalFingers: GestureFingers;
     verticalFingers: GestureFingers;
     balancedGraphics: boolean;
+    spectrumEnabled: boolean;
 };
 export const DEFAULT_CAR_PREFERENCES: CarPreferences = {
     immersive: true,
     horizontalFingers: 1,
     verticalFingers: 2,
     balancedGraphics: true,
+    spectrumEnabled: false,
 };
 export const useCarSettings = create<
     CarPreferences & { setPreference: <K extends keyof CarPreferences>(key: K, value: CarPreferences[K]) => void }
@@ -31,6 +33,7 @@ export const useCarSettings = create<
                     [0, 1, 2, 3].includes(input as number) ? (input as GestureFingers) : fallback;
                 return {
                     ...current,
+                    spectrumEnabled: value.spectrumEnabled === true,
                     immersive: typeof value.immersive === 'boolean' ? value.immersive : current.immersive,
                     balancedGraphics:
                         typeof value.balancedGraphics === 'boolean' ? value.balancedGraphics : current.balancedGraphics,

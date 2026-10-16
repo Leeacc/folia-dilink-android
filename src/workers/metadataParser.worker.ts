@@ -1,4 +1,6 @@
 import { parseBlob } from 'music-metadata';
+import { repairFlacMetadata } from '../utils/flacMetadataRepair';
+import { hasLegacyId3Tags, repairLatin1DecodedGbkText } from '../utils/legacyTagTextRepair';
 
 interface ParsedLyricLine {
     text?: string;
@@ -29,6 +31,7 @@ interface EmbeddedMetadataResult {
     trackNumber?: number;
     discNumber?: number;
     cover?: Blob;
+    coverAssetId?: string;
     bitrate?: number;
     lyrics?: string;
     translationLyrics?: string;
@@ -38,6 +41,16 @@ interface EmbeddedMetadataResult {
     replayGainAlbumGain?: number;
     replayGainAlbumPeak?: number;
     duration?: number;
+}
+
+const toHex = (bytes: Uint8Array): string => Array.from(bytes)
+    .map(value => value.toString(16).padStart(2, '0'))
+    .join('');
+
+async function hashCoverBytes(bytes: BufferSource): Promise<string | undefined> {
+    if (!crypto?.subtle) return undefined;
+    const digest = await crypto.subtle.digest('SHA-256', bytes);
+    return `sha256:${toHex(new Uint8Array(digest))}`;
 }
 
 function formatLrcTimestamp(timestampMs: number): string {
@@ -140,7 +153,8 @@ function getDurationFromParsedMetadata(durationSeconds?: number): number {
 }
 
 async function extractEmbeddedMetadata(file: File, includeCover = false): Promise<EmbeddedMetadataResult> {
-    const parsed = await parseBlob(file, includeCover ? undefined : { skipCovers: true });
+    const parsingInput = await repairFlacMetadata(file, includeCover);
+    const parsed = await parseBlob(parsingInput, includeCover ? undefined : { skipCovers: true });
 
     let originalLyric: string | undefined;
     let translationLyric: string | undefined;
@@ -214,16 +228,25 @@ async function extractEmbeddedMetadata(file: File, includeCover = false): Promis
         ? replayGainAlbumPeakTag.ratio
         : undefined;
 
+    const picture = includeCover ? parsed.common.picture?.[0] : undefined;
+    const cover = picture
+        ? new Blob([picture.data as any], { type: picture.format })
+        : undefined;
+    const coverAssetId = picture ? await hashCoverBytes(Uint8Array.from(picture.data)) : undefined;
+
+    const repairTagText = hasLegacyId3Tags(parsed.format.tagTypes)
+        ? (text: string | undefined) => (text ? repairLatin1DecodedGbkText(text) : text)
+        : (text: string | undefined) => text;
+
     return {
-        title: parsed.common.title,
-        artist: parsed.common.artist,
-        artists: parsed.common.artists,
-        album: parsed.common.album,
+        title: repairTagText(parsed.common.title),
+        artist: repairTagText(parsed.common.artist),
+        artists: parsed.common.artists?.map(artist => repairTagText(artist) ?? artist),
+        album: repairTagText(parsed.common.album),
         trackNumber: parsed.common.track.no ?? undefined,
         discNumber: parsed.common.disk.no ?? undefined,
-        cover: includeCover && parsed.common.picture?.[0]
-            ? new Blob([parsed.common.picture[0].data as any], { type: parsed.common.picture[0].format })
-            : undefined,
+        cover,
+        coverAssetId,
         bitrate: parsed.format.bitrate,
         lyrics: originalLyric,
         translationLyrics: translationLyric,
@@ -237,19 +260,31 @@ async function extractEmbeddedMetadata(file: File, includeCover = false): Promis
 }
 
 self.onmessage = async (e: MessageEvent) => {
-    const { type, file, includeCover, requestId } = e.data as {
+    const { type, file, cover, includeCover, requestId } = e.data as {
         type: string;
-        file: File;
+        file?: File;
+        cover?: Blob;
         includeCover?: boolean;
         requestId: string;
     };
 
-    if (type !== 'parse-metadata') {
+    if (type !== 'parse-metadata' && type !== 'hash-cover') {
         self.postMessage({ type: 'error', message: 'Unknown message type', requestId });
         return;
     }
 
     try {
+        if (type === 'hash-cover') {
+            if (!(cover instanceof Blob) || cover.size === 0 || !cover.type.startsWith('image/')) {
+                throw new Error('Invalid local cover payload');
+            }
+            const coverAssetId = await hashCoverBytes(await cover.arrayBuffer());
+            if (!coverAssetId) throw new Error('Web Crypto SHA-256 is unavailable');
+            self.postMessage({ type: 'result', data: { cover, coverAssetId }, requestId });
+            return;
+        }
+
+        if (!(file instanceof File)) throw new Error('Missing metadata file');
         const data = await extractEmbeddedMetadata(file, Boolean(includeCover));
         self.postMessage({ type: 'result', data, requestId });
     } catch (err) {

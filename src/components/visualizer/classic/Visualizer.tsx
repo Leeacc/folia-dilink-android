@@ -1,16 +1,19 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence, MotionValue, Variants, useMotionValueEvent } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { DEFAULT_CLASSIC_TUNING, Line, Theme, Word as WordType, AudioBands, type ClassicTuning } from '../../../types';
-import { getLineRenderEndTime, getLineRenderHints } from '../../../utils/lyrics/renderHints';
+import { DEFAULT_CLASSIC_TUNING, AudioBands, type ClassicTuning } from '../../../types';
+import { getLineRenderEndTime } from '../../../utils/lyrics/renderHints';
 import { useVisualizerRuntime } from '../runtime';
 import { type VisualizerSharedProps } from '../definition';
 import VisualizerShell from '../VisualizerShell';
 import VisualizerSubtitleOverlay from '../VisualizerSubtitleOverlay';
+import { resolveSubtitleFontSizes } from '../subtitleFontSizes';
 import { buildPostLyricLayoutUnits, buildDisplayWordsFromLayoutUnits } from '../../../utils/lyrics/cjkSemanticLayout';
-import { buildWordGraphemeTimings } from '../../../utils/lyrics/graphemeTiming';
 import { resolveThemeFontStack, resolveThemeFontWeight } from '../../../utils/fontStacks';
 import { resolveWordColor } from '../wordColoring';
+import { GlowWord } from '../GlowWord';
+import { getGlowWordLineContainerMotion, resolveGlowWordRenderProfile } from '../glowWordTiming';
+import { buildGlowWordLayoutVariants, glowWordBodyVariants } from '../glowWordVariants';
 
 // This mode is the most straightforward lyric pipeline in the folder.
 // First we ask runtime which line is active right now, then read renderHints from that line,
@@ -40,14 +43,6 @@ interface LineLayoutConfig {
     perspective: number;
 }
 
-interface ClassicLineRenderProfile {
-    renderHints: NonNullable<Line['renderHints']> | null;
-    lineRenderEndTime: number;
-    lineTransitionMode: 'normal' | 'fast' | 'none';
-    wordRevealMode: 'normal' | 'fast' | 'instant';
-    wordLookahead: number;
-}
-
 const clampClassicBreathingFloatMultiplier = (value: number) => Math.min(2, Math.max(0, value));
 const clampClassicWordSpacing = (value: number) => Math.min(2, Math.max(0, value));
 
@@ -62,83 +57,6 @@ const resolveClassicTuning = (tuning?: ClassicTuning): ClassicTuning => ({
 
 // Helper to determine if text contains CJK characters
 const isCJK = (text: string) => /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/.test(text);
-
-const resolveClassicLineRenderProfile = (line: Line | null | undefined): ClassicLineRenderProfile | null => {
-    if (!line) {
-        return null;
-    }
-
-    // Render hints come from the lyric pipeline, not from the visualizer itself.
-    // This function is just repackaging them into something easier to consume frame-by-frame.
-    const renderHints = getLineRenderHints(line);
-    const wordRevealMode = renderHints?.wordRevealMode ?? 'normal';
-
-    return {
-        renderHints,
-        lineRenderEndTime: getLineRenderEndTime(line),
-        lineTransitionMode: renderHints?.lineTransitionMode ?? 'normal',
-        wordRevealMode,
-        wordLookahead: wordRevealMode === 'instant' ? 0.03 : wordRevealMode === 'fast' ? 0.08 : 0.15,
-    };
-};
-
-const getClassicWordActiveEndTime = (word: WordType, renderProfile: ClassicLineRenderProfile) => {
-    if (renderProfile.wordRevealMode === 'instant') {
-        return renderProfile.lineRenderEndTime;
-    }
-
-    if (renderProfile.wordRevealMode === 'fast') {
-        return Math.min(renderProfile.lineRenderEndTime, Math.max(word.endTime, word.startTime + 0.12));
-    }
-
-    return word.endTime;
-};
-
-const getClassicWordDisplayDuration = (word: WordType, renderProfile: ClassicLineRenderProfile) => {
-    const activeEndTime = getClassicWordActiveEndTime(word, renderProfile);
-    const minDuration = renderProfile.wordRevealMode === 'instant'
-        ? 0.08
-        : renderProfile.wordRevealMode === 'fast'
-            ? 0.12
-            : 0.1;
-
-    return Math.max(activeEndTime - word.startTime, minDuration);
-};
-
-const getClassicLineContainerMotion = (renderProfile: ClassicLineRenderProfile | null) => {
-    if (renderProfile?.lineTransitionMode === 'none') {
-        return {
-            initial: { opacity: 1, scale: 1, filter: 'blur(0px)' },
-            animate: { opacity: 1, scale: 1, filter: 'blur(0px)', transitionEnd: { filter: 'none' } },
-            exit: { opacity: 0, scale: 1.02, filter: 'blur(6px)', transition: { duration: 0.12, ease: 'easeOut' as const } },
-        };
-    }
-
-    if (renderProfile?.lineTransitionMode === 'fast') {
-        return {
-            initial: { opacity: 0.35, scale: 0.96, filter: 'blur(4px)' },
-            animate: {
-                opacity: 1,
-                scale: 1,
-                filter: 'blur(0px)',
-                transition: { duration: 0.16, ease: 'easeOut' as const },
-                transitionEnd: { filter: 'none' },
-            },
-            exit: {
-                opacity: 0,
-                scale: 1.04,
-                filter: 'blur(10px)',
-                transition: { duration: 0.16, ease: 'easeInOut' as const },
-            },
-        };
-    }
-
-    return {
-        initial: { opacity: 0, scale: 0.9, filter: 'blur(10px)' },
-        animate: { opacity: 1, scale: 1, filter: 'blur(0px)', transitionEnd: { filter: 'none' } },
-        exit: { opacity: 0, scale: 1.1, filter: 'blur(20px)', transition: { duration: 0.3 } },
-    };
-};
 
 let classicMeasureCanvas: HTMLCanvasElement | null = null;
 
@@ -160,129 +78,6 @@ const measureWordWidth = (text: string, pxSize: number, fontStack: string, fontW
     return context.measureText(text).width;
 };
 
-const Word: React.FC<{
-    word: WordType;
-    config: WordLayoutConfig;
-    currentTime: MotionValue<number>;
-    theme: Theme;
-    isChaotic: boolean;
-    layoutVariants: Variants;
-    bodyVariants: Variants;
-    glowVariants: Variants;
-    baseColor: string;
-    activeColor: string;
-    renderProfile: ClassicLineRenderProfile;
-    isChorus?: boolean;
-    fontSize: string;
-}> = ({ word, config, currentTime, theme, isChaotic, layoutVariants, bodyVariants, glowVariants, baseColor, activeColor, renderProfile, isChorus, fontSize }) => {
-    const [status, setStatus] = useState<"waiting" | "active" | "passed">("waiting");
-    const rippleScale = useMemo(() => 1.5 + Math.random() * 2, []);
-    const duration = getClassicWordDisplayDuration(word, renderProfile);
-    const activeEndTime = getClassicWordActiveEndTime(word, renderProfile);
-    const graphemeTimings = useMemo(() => buildWordGraphemeTimings(word), [word]);
-
-    useMotionValueEvent(currentTime, "change", (latest: number) => {
-        let newStatus: "waiting" | "active" | "passed" = "waiting";
-
-        if (latest >= word.startTime - renderProfile.wordLookahead && latest <= activeEndTime) {
-            newStatus = "active";
-        } else if (latest > activeEndTime) {
-            newStatus = "passed";
-        } else {
-            newStatus = "waiting";
-        }
-
-        if (newStatus !== status) {
-            setStatus(newStatus);
-        }
-    });
-
-    return (
-        <motion.div
-            key={`${config.id}`}
-            custom={{
-                config,
-                activeColor,
-                baseColor,
-                duration,
-                wordRevealMode: renderProfile.wordRevealMode,
-            }}
-            variants={layoutVariants}
-            initial="waiting"
-            animate={status}
-            // Add `whitespace-nowrap` to prevent unexpected line breaks
-            className="inline-block origin-center relative will-change-transform whitespace-nowrap"
-            style={{
-                fontSize,
-                fontWeight: resolveThemeFontWeight(theme, 700),
-                marginRight: config.marginRight,
-                alignSelf: config.alignSelf,
-                lineHeight: 1.22,
-            }}
-        >
-            {/* Glow Layer - Handles Text Shadow - Absolute Position */}
-            <span
-                className="absolute inset-0 select-none pointer-events-none block"
-                aria-hidden="true"
-            >
-                {graphemeTimings.length > 1 ? (
-                    graphemeTimings.map((timing, index) => (
-                        <motion.span
-                            key={index}
-                            variants={glowVariants}
-                            custom={{
-                                config,
-                                activeColor,
-                                baseColor,
-                                duration,
-                                index,
-                                total: graphemeTimings.length,
-                                charStartTime: timing.startTime,
-                                charEndTime: timing.endTime,
-                                wordStartTime: word.startTime,
-                                wordRevealMode: renderProfile.wordRevealMode,
-                            }}
-                        >
-                            {timing.char}
-                        </motion.span>
-                    ))
-                ) : (
-                    <motion.span
-                        variants={glowVariants}
-                        custom={{ config, activeColor, baseColor, duration, wordRevealMode: renderProfile.wordRevealMode }}
-                    >
-                        {word.text}
-                    </motion.span>
-                )}
-            </span>
-
-            {/* Body Layer - Handles Color and Blur - Relative Position */}
-            <motion.span
-                variants={bodyVariants}
-                custom={{ config, activeColor, baseColor, duration, wordRevealMode: renderProfile.wordRevealMode }}
-                className="relative z-10 block"
-            >
-                {word.text}
-            </motion.span>
-
-            {/* Chorus Ripple Effect */}
-            <AnimatePresence>
-                {isChorus && status === 'active' && (
-                    <motion.span
-                        key="ripple"
-                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[150%] aspect-square rounded-full border-1 pointer-events-none z-0"
-                        style={{ borderColor: activeColor, filter: "blur(1px)" }}
-                        initial={{ scale: 0.2, opacity: 0.8 }}
-                        animate={{ scale: rippleScale, opacity: 0 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.5, ease: "easeOut" }}
-                    />
-                )}
-            </AnimatePresence>
-        </motion.div>
-    );
-};
-
 const Visualizer: React.FC<VisualizerProps> = (props) => {
     const {
         currentTime,
@@ -297,6 +92,7 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
         subtitleFontScale = 1,
         subtitleOverlayOpacity,
         subtitleOverlayBackground,
+        subtitleUpcomingLyricsBlur,
         isPlayerChromeHidden = false,
         hideTranslationSubtitle = false,
         showSubtitleTranslation = true,
@@ -315,9 +111,9 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
         lines,
         getLineEndTime: getLineRenderEndTime,
     });
-    const activeLineRenderProfile = activeLine ? resolveClassicLineRenderProfile(activeLine) : null;
-    const activeWordRenderProfile = activeLineRenderProfile ?? (activeLine ? resolveClassicLineRenderProfile(activeLine) : null);
-    const activeLineContainerMotion = getClassicLineContainerMotion(activeLineRenderProfile);
+    const activeLineRenderProfile = activeLine ? resolveGlowWordRenderProfile(activeLine) : null;
+    const activeWordRenderProfile = activeLineRenderProfile ?? (activeLine ? resolveGlowWordRenderProfile(activeLine) : null);
+    const activeLineContainerMotion = getGlowWordLineContainerMotion(activeLineRenderProfile);
 
     const [viewportWidth, setViewportWidth] = useState(() => (
         typeof window === 'undefined' ? 1200 : window.innerWidth
@@ -342,8 +138,7 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
 
     const mainFontSize = `clamp(${(2.25 * lyricsFontScale).toFixed(3)}rem, ${(6 * lyricsFontScale).toFixed(3)}vw, ${(4.5 * lyricsFontScale).toFixed(3)}rem)`;
     const emptyFontSize = `clamp(${(1.5 * lyricsFontScale).toFixed(3)}rem, ${(3.5 * lyricsFontScale).toFixed(3)}vw, ${(2.25 * lyricsFontScale).toFixed(3)}rem)`;
-    const translationFontSize = `clamp(${(1.125 * lyricsFontScale).toFixed(3)}rem, ${(2.6 * lyricsFontScale).toFixed(3)}vw, ${(1.25 * lyricsFontScale).toFixed(3)}rem)`;
-    const upcomingFontSize = `clamp(${(0.875 * lyricsFontScale).toFixed(3)}rem, ${(2 * lyricsFontScale).toFixed(3)}vw, ${(1 * lyricsFontScale).toFixed(3)}rem)`;
+    const { translationFontSize, upcomingFontSize } = resolveSubtitleFontSizes(lyricsFontScale);
 
     // Generate a stable random layout configuration for the current line.
     // Use the line start time as seed so the same lyric does not reshuffle every rerender.
@@ -469,165 +264,8 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
         return { wordConfigs, lineConfig };
     }, [activeLine, displayWords, resolvedClassicTuning.enableWordRotation, resolvedClassicTuning.useLegacyLayout, resolvedClassicTuning.wordSpacing, theme, lyricsFontScale, viewportWidth]);
 
-    // Container motion is the "body" of each word.
-    // waiting/active/passed all reuse the same layout config but interpret it differently.
-    const layoutVariants: Variants = {
-        waiting: ({ config }: any) => ({
-            opacity: 0,
-            scale: 0.5,
-            x: config.x + (Math.sin(config.y) * 100),
-            y: config.y + (Math.cos(config.x) * 50),
-            rotate: resolvedClassicTuning.enableWordRotation ? config.rotate + 20 : 0,
-            transition: { duration: 0.4 }
-        }),
-        active: ({ config }: any) => ({
-            opacity: 1,
-            scale: isNaN(config.scale) ? 1.5 : config.scale * 1.4,
-            x: config.x,
-            y: config.y,
-            rotate: config.rotate,
-            transition: {
-                type: "spring" as const,
-                stiffness: 200,
-                damping: 20,
-                opacity: { duration: 0.1 }
-            }
-        }),
-        passed: ({ config, baseColor }: any) => ({
-            opacity: theme.animationIntensity === 'chaotic' ? 0.9 : 0.82,
-            scale: config.scale || 1,
-            x: config.x,
-            y: config.y,
-            rotate: config.rotate + config.passedRotate,
-            transition: {
-                duration: 0.5,
-                rotate: {
-                    duration: 5,
-                    ease: "linear"
-                }
-            }
-        })
-    };
-
-    // Body layer is where color transition and blur cleanup happen.
-    // Glow is separated so we can overdrive highlight without making the actual glyph unreadable.
-    const bodyVariants: Variants = {
-        waiting: ({ baseColor }: any) => ({
-            color: baseColor,
-            filter: "blur(10px)",
-            transition: { duration: 0.4 }
-        }),
-        active: ({ activeColor, duration, wordRevealMode }: any) => ({
-            color: activeColor,
-            filter: "none",
-            transition: {
-                color: { duration: duration || 0.2, ease: "linear" },
-                filter: { type: "tween", duration: wordRevealMode === 'instant' ? 0.08 : wordRevealMode === 'fast' ? 0.12 : 0.2 }
-            },
-            transitionEnd: {
-                filter: "none"
-            }
-        }),
-        passed: ({ baseColor, wordRevealMode }: any) => ({
-            color: baseColor,
-            filter: "blur(0px)",
-            transition: {
-                color: { duration: wordRevealMode === 'instant' ? 0.12 : wordRevealMode === 'fast' ? 0.24 : 0.8, ease: "easeInOut" },
-                filter: { duration: wordRevealMode === 'instant' ? 0.12 : wordRevealMode === 'fast' ? 0.2 : 0.5 }
-            },
-            transitionEnd: {
-                filter: "none"
-            }
-        })
-    };
-
-    // Glow layer is transparent text + text-shadow only.
-    // This is why active highlights can look large without changing the readable body thickness.
-    const glowVariants: Variants = {
-        waiting: {
-            color: "transparent",
-            textShadow: "none",
-        },
-        active: ({ activeColor, duration, index, total, charStartTime, charEndTime, wordStartTime, wordRevealMode }: any) => {
-            if (wordRevealMode === 'instant') {
-                return {
-                    color: "transparent",
-                    textShadow: [
-                        "none",
-                        `0 0 14px ${activeColor}, 0 0 24px ${activeColor}`,
-                        "none"
-                    ],
-                    transition: {
-                        duration: Math.min(duration || 0.08, 0.12),
-                        times: [0, 0.35, 1],
-                        ease: "easeOut"
-                    }
-                };
-            }
-
-            if (wordRevealMode === 'fast') {
-                return {
-                    color: "transparent",
-                    textShadow: [
-                        "none",
-                        `0 0 18px ${activeColor}, 0 0 32px ${activeColor}`,
-                        "none"
-                    ],
-                    transition: {
-                        duration: Math.min(Math.max(duration || 0.12, 0.12), 0.2),
-                        times: [0, 0.4, 1],
-                        ease: "easeInOut"
-                    }
-                };
-            }
-
-            if (total !== undefined && total > 1) {
-                const singleDuration = duration / total;
-                const hasCharTiming = typeof charStartTime === 'number'
-                    && typeof charEndTime === 'number'
-                    && typeof wordStartTime === 'number';
-                const resolvedCharDuration = hasCharTiming ? charEndTime - charStartTime : 0;
-                const charDuration = hasCharTiming
-                    ? Math.max(resolvedCharDuration, 0.001)
-                    : singleDuration;
-                const charDelay = hasCharTiming
-                    ? Math.max(0, charStartTime - wordStartTime)
-                    : singleDuration * index;
-                return {
-                    color: "transparent",
-                    textShadow: [
-                        "none",
-                        `0 0 20px ${activeColor}, 0 0 40px ${activeColor}`,
-                        "none"
-                    ],
-                    transition: {
-                        duration: charDuration * 6, // stretch the fade over a few letters
-                        times: [0, 0.3, 1], // peak early, then fade
-                        delay: charDelay,
-                        ease: "easeInOut"
-                    }
-                };
-            }
-            return {
-                color: "transparent",
-                textShadow: [
-                    "none",
-                    `0 0 20px ${activeColor}, 0 0 40px ${activeColor}`,
-                    `0 0 20px ${activeColor}, 0 0 40px ${activeColor}`,
-                ],
-                transition: {
-                    duration: (duration || 0.1), // stretch the fade over the word duration
-                    times: [0, 0.9, 1], // peak early, then fade
-                    ease: "easeInOut"
-                }
-            };
-        },
-        passed: ({ wordRevealMode }: any) => ({
-            color: "transparent",
-            textShadow: "none",
-            transition: { duration: wordRevealMode === 'instant' ? 0.12 : wordRevealMode === 'fast' ? 0.22 : 0.9, ease: "easeOut" }
-        })
-    };
+    const layoutVariants = buildGlowWordLayoutVariants(theme.animationIntensity, resolvedClassicTuning.enableWordRotation);
+    const bodyVariants = glowWordBodyVariants;
 
     const lyricContainerFloat = useMemo(() => {
         const multiplier = resolvedClassicTuning.breathingFloatMultiplier;
@@ -687,21 +325,20 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
                                 const activeColor = resolveWordColor(word.text, theme.wordColors, theme.accentColor);
 
                                 return (
-                                    <Word
+                                    <GlowWord
                                         key={`${word.text}-${idx}-${activeLine.startTime}`}
                                         word={word}
                                         config={config}
                                         currentTime={currentTime}
                                         theme={theme}
-                                        isChaotic={theme.animationIntensity === 'chaotic'}
                                         layoutVariants={layoutVariants}
                                         bodyVariants={bodyVariants}
-                                        glowVariants={glowVariants}
                                         baseColor={theme.primaryColor}
                                         activeColor={activeColor}
                                         renderProfile={activeWordRenderProfile!}
                                         isChorus={activeLine.isChorus}
                                         fontSize={mainFontSize}
+                                        layoutStyle={{ marginRight: config.marginRight, alignSelf: config.alignSelf }}
                                     />
                                 );
                             })}
@@ -737,6 +374,7 @@ const Visualizer: React.FC<VisualizerProps> = (props) => {
                 upcomingFontSize={upcomingFontSize}
                 subtitleOverlayOpacity={subtitleOverlayOpacity}
                 subtitleOverlayBackground={subtitleOverlayBackground}
+                subtitleUpcomingLyricsBlur={subtitleUpcomingLyricsBlur}
                 subtitleFontScale={subtitleFontScale}
                 isPlayerChromeHidden={isPlayerChromeHidden}
                 hideTranslationSubtitle={hideTranslationSubtitle}

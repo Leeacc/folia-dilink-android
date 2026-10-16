@@ -1,0 +1,10 @@
+{
+  "appId": "io.github.leeacc.folia.dilink",
+  "appName": "Folia",
+  "webDir": "dist",
+  "loggingBehavior": "none",
+  "backgroundColor": "#09090b",
+  "android": { "minWebViewVersion": 95 },
+  "server": { "errorPath": "unsupported-webview.html", "androidScheme": "https", "hostname": "localhost", "cleartext": false },
+  "plugins": { "SplashScreen": { "launchAutoHide": true, "launchShowDuration": 900, "backgroundColor": "#09090b", "showSpinner": false } }
+}

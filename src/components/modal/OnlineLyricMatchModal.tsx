@@ -6,7 +6,7 @@ import { formatSongName } from '../../utils/songNameFormatter';
 import { loadOnlineLyricsState, saveOnlineLyricsState } from '../../utils/onlineLyricsState';
 import { calculateMatchScore } from '../../utils/lyrics/matchScore';
 import { buildLyricSearchQuery } from '../../utils/lyrics/searchQuery';
-import { fetchLyricsForMatchSource, LYRIC_MATCH_SOURCES, searchLyricsByMatchSource, sourceSupportsManualSearch } from '../../utils/lyrics/lyricMatchSources';
+import { fetchLyricsForMatchSource, LYRIC_MATCH_SOURCES, searchLyricsByMatchSource } from '../../utils/lyrics/lyricMatchSources';
 import { getLyricMatchSourceLabel, type LyricMatchSource } from './lyricMatchResultHelpers';
 import {
     getMatchResultCoverUrl,
@@ -15,6 +15,8 @@ import {
 } from './lyricMatchResultHelpers';
 import { LyricPreviewPanel } from './LyricPreviewPanel';
 import { getProviderSongMetadata } from '../../services/onlineMusic/songMetadata';
+import { getSizedCoverUrl } from '../../utils/coverUrl';
+import { hasRenderableLyrics } from '../../utils/lyrics/validity';
 
 // src/components/modal/OnlineLyricMatchModal.tsx
 
@@ -56,15 +58,9 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
         };
     }, [song]);
 
-    const getMatchQuery = (query = searchQuery) => (
-        sourceSupportsManualSearch(source)
-            ? query.trim()
-            : buildLyricSearchQuery(songInfo.title, songInfo.artist, songInfo.album || '')
-    );
-
     const handleSearch = async (query = searchQuery) => {
-        const q = getMatchQuery(query);
-        if (!q.trim()) {
+        const q = query.trim();
+        if (!q) {
             return;
         }
 
@@ -133,7 +129,12 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
         try {
             const processed = await fetchLyricsForMatchSource(source, selectedResult);
 
-            if (processed && (processed.lyrics || processed.isPureMusic)) {
+            if (!processed || (!hasRenderableLyrics(processed.lyrics) && !processed.isPureMusic)) {
+                alert(t('localMusic.noLyricsAvailable'));
+                return;
+            }
+
+            if (processed) {
                 const previousState = await loadOnlineLyricsState(song);
                 const nextState: OnlineLyricsState = {
                     lyricsSource: 'online',
@@ -211,30 +212,28 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
                             })}
                         </div>
 
-                        {sourceSupportsManualSearch(source) && (
-                            <div className="flex gap-3">
-                                <div className={`flex-1 flex items-center gap-3 rounded-2xl border px-4 py-3 ${inputBg}`}>
-                                    <Search size={18} className={textSecondary} />
-                                    <input
-                                        value={searchQuery}
-                                        onChange={event => setSearchQuery(event.target.value)}
-                                        onKeyDown={event => {
-                                            if (event.key === 'Enter') {
-                                                void handleSearch();
-                                            }
-                                        }}
-                                        className={`flex-1 bg-transparent outline-none text-sm ${textPrimary}`}
-                                    />
-                                </div>
-                                <button
-                                    onClick={() => void handleSearch()}
-                                    disabled={isSearching}
-                                    className={`px-4 rounded-2xl text-sm font-medium transition-colors ${searchBtnBg}`}
-                                >
-                                    {isSearching ? <Loader2 size={16} className="animate-spin" /> : t('localMusic.search')}
-                                </button>
+                        <div className="flex gap-3">
+                            <div className={`flex-1 flex items-center gap-3 rounded-2xl border px-4 py-3 ${inputBg}`}>
+                                <Search size={18} className={textSecondary} />
+                                <input
+                                    value={searchQuery}
+                                    onChange={event => setSearchQuery(event.target.value)}
+                                    onKeyDown={event => {
+                                        if (event.key === 'Enter') {
+                                            void handleSearch();
+                                        }
+                                    }}
+                                    className={`flex-1 bg-transparent outline-none text-sm ${textPrimary}`}
+                                />
                             </div>
-                        )}
+                            <button
+                                onClick={() => void handleSearch()}
+                                disabled={isSearching}
+                                className={`px-4 rounded-2xl text-sm font-medium transition-colors ${searchBtnBg}`}
+                            >
+                                {isSearching ? <Loader2 size={16} className="animate-spin" /> : t('localMusic.search')}
+                            </button>
+                        </div>
 
                         <div className="min-h-0 flex-1 overflow-y-auto space-y-3 pr-1">
                             {isSearching ? (
@@ -263,7 +262,7 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
                                                 <div className={`w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center ${isDaylight ? 'bg-black/5' : 'bg-white/5'} shrink-0`}>
                                                     {resultCover ? (
                                                         <img
-                                                            src={resultCover}
+                                                            src={getSizedCoverUrl(resultCover, 512)}
                                                             alt="Cover"
                                                             className="w-full h-full object-cover"
                                                         />
@@ -298,13 +297,13 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
                             <div className="w-32 h-32 min-h-[64px] rounded-2xl overflow-hidden bg-zinc-800 shadow-md flex-shrink transition-all duration-300">
                                 {selectedResult ? (
                                     getMatchResultCoverUrl(selectedResult, source) ? (
-                                        <img src={getMatchResultCoverUrl(selectedResult, source) || ''} alt="Cover" className="w-full h-full object-cover" />
+                                        <img src={getSizedCoverUrl(getMatchResultCoverUrl(selectedResult, source), 512)} alt="Cover" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center"><Music size={28} className="opacity-10" /></div>
                                     )
                                 ) : (
                                     getProviderSongMetadata(song).coverUrl ? (
-                                        <img src={getProviderSongMetadata(song).coverUrl || ''} alt="Cover" className="w-full h-full object-cover" />
+                                        <img src={getSizedCoverUrl(getProviderSongMetadata(song).coverUrl, 512)} alt="Cover" className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex items-center justify-center"><Music size={28} className="opacity-10" /></div>
                                     )
@@ -332,7 +331,11 @@ const OnlineLyricMatchModal: React.FC<OnlineLyricMatchModalProps> = ({ song, onC
 
                         {/* Lyric Preview Panel */}
                         <div className="w-full h-28 flex-shrink-0 mt-4 flex flex-col">
-                            <LyricPreviewPanel selectedResult={selectedResult} source={source} isDaylight={isDaylight} />
+                            <LyricPreviewPanel
+                                selectedResult={selectedResult}
+                                source={source}
+                                isDaylight={isDaylight}
+                            />
                         </div>
                     </div>
                 </div>

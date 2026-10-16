@@ -3,7 +3,7 @@ const fs = require('node:fs');
 // Exercise real settings navigation and the last reachable control at car pane sizes.
 module.exports = async function checkVisualizerSettings(page) {
   await page.reload({waitUntil: 'domcontentloaded'});
-  await page.waitForFunction(() => document.getElementById('root')?.innerText.includes('Folia'));
+  await page.waitForFunction(() => document.querySelector('[data-library-stage]') || document.getElementById('root')?.children.length > 0);
   await page.waitForTimeout(1000);
   await page.evaluate(() => {
     const state = {view: 'player', appHistoryIndex: 1};

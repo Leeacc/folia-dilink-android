@@ -9,7 +9,6 @@ import {
 } from '../services/playbackAdapters';
 import { omni } from '../services/onlineMusic/omni';
 import { isLocalPlaybackSong, isNavidromePlaybackSong } from '../utils/appPlaybackGuards';
-import { supportsLocalMusicImport } from '../platform/runtime';
 
 const LAST_HOME_VIEW_TAB_KEY = 'last_home_view_tab';
 const DEFAULT_SEARCH_LIMIT = 30;
@@ -57,6 +56,7 @@ interface SearchNavigationState {
     restoreSearch: (payload: { query: string; sourceTab: SearchSource; returnView?: SearchReturnView; }) => void;
     hideSearchOverlay: () => void;
     resetRuntime: (onlineProviderId?: OnlineProviderId) => void;
+    followOnlineProvider: (providerId: OnlineProviderId) => void;
     submitSearch: (payload: { query?: string; sourceTab: SearchSource; deps: SearchExecutorDeps; returnView?: SearchReturnView; }) => Promise<boolean>;
     loadMoreSearchResults: (payload: { deps: SearchExecutorDeps; }) => Promise<void>;
 }
@@ -171,11 +171,7 @@ const getInitialHomeViewTab = (): HomeViewTab => {
         return 'playlist';
     }
     const savedTab = localStorage.getItem(LAST_HOME_VIEW_TAB_KEY);
-    return savedTab === 'playlist'
-        || (savedTab === 'local' && supportsLocalMusicImport())
-        || savedTab === 'albums'
-        || savedTab === 'navidrome'
-        || savedTab === 'radio'
+    return savedTab === 'playlist' || savedTab === 'local' || savedTab === 'albums' || savedTab === 'navidrome' || savedTab === 'radio'
         ? savedTab
         : 'playlist';
 };
@@ -197,11 +193,10 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
     scrollTop: 0,
     searchCache: {},
     setHomeViewTab: (tab) => {
-        const resolvedTab = tab === 'local' && !supportsLocalMusicImport() ? 'playlist' : tab;
         if (typeof window !== 'undefined') {
-            localStorage.setItem(LAST_HOME_VIEW_TAB_KEY, resolvedTab);
+            localStorage.setItem(LAST_HOME_VIEW_TAB_KEY, tab);
         }
-        set({ homeViewTab: resolvedTab });
+        set({ homeViewTab: tab });
     },
     setSearchQuery: (query) => set({ searchQuery: query }),
     setSearchScrollTop: (scrollTop) => set(state => {
@@ -248,6 +243,15 @@ export const useSearchNavigationStore = create<SearchNavigationState>((set, get)
         hasMore: false,
         scrollTop: 0,
     })),
+    // The overlay's online source is the active provider. A switch moves it through resetRuntime, but
+    // the active provider also changes without one (startup, session restore, a Folium mod source going
+    // away), so this keeps it in step. Local and Navidrome are left alone, and the results stay: clearing
+    // them is the switch's job.
+    followOnlineProvider: (providerId) => set(state => (
+        state.searchSourceTab === 'local' || state.searchSourceTab === 'navidrome' || state.searchSourceTab === providerId
+            ? state
+            : { searchSourceTab: providerId }
+    )),
     submitSearch: async ({ query, sourceTab, deps, returnView = 'home' }) => {
         const trimmedQuery = (query ?? get().searchQuery).trim();
         if (!trimmedQuery) {

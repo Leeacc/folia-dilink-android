@@ -1,3 +1,4 @@
+import { carFrameInterval, carGraphicsBalanced } from './carPerformance';
 // src/utils/frameRateLimiter.ts
 // Shared helpers and global RAF gate for optional visualizer frame throttling.
 
@@ -45,11 +46,11 @@ export const shouldProcessFrameAtRate = (
     lastProcessedTimestampMs: number,
     frameRate: VisualizerFrameRate,
 ) => {
-    if (frameRate === 'off') {
+    if (frameRate === 'off' && !carGraphicsBalanced()) {
         return true;
     }
 
-    const intervalMs = 1000 / frameRate - FRAME_INTERVAL_TOLERANCE_MS;
+    const intervalMs = Math.max(frameRate === 'off' ? 0 : 1000 / frameRate, carFrameInterval()) - FRAME_INTERVAL_TOLERANCE_MS;
     return lastProcessedTimestampMs === 0 || timestampMs - lastProcessedTimestampMs >= intervalMs;
 };
 
@@ -89,10 +90,13 @@ export const createFrameRateLimitedRaf = (
         }
 
         lastProcessedTimestamp = timestamp;
-        const frameCallbacks = Array.from(callbacks.entries());
-        callbacks.clear();
+        const frameHandles = Array.from(callbacks.keys());
 
-        for (const [, callback] of frameCallbacks) {
+        for (const handle of frameHandles) {
+            // Match native RAF: an earlier callback may cancel a later one in the same frame.
+            const callback = callbacks.get(handle);
+            if (!callback) continue;
+            callbacks.delete(handle);
             try {
                 callback(timestamp);
             } catch (error) {
@@ -113,6 +117,10 @@ export const createFrameRateLimitedRaf = (
         },
         cancelAnimationFrame: (handle) => {
             callbacks.delete(handle);
+            if (callbacks.size === 0 && nativeFrameHandle !== null) {
+                nativeCancelAnimationFrame(nativeFrameHandle);
+                nativeFrameHandle = null;
+            }
         },
         setFrameRate: (nextFrameRate) => {
             frameRate = nextFrameRate;
@@ -168,8 +176,8 @@ export const installGlobalVisualizerFrameRateLimiter = (overrideFrameRate?: Visu
         return;
     }
 
-    const initialFrameRate = overrideFrameRate
-        ?? parseVisualizerFrameRate(window.localStorage.getItem(VISUALIZER_FRAME_RATE_STORAGE_KEY));
+    const requested = overrideFrameRate ?? parseVisualizerFrameRate(window.localStorage.getItem(VISUALIZER_FRAME_RATE_STORAGE_KEY));
+    const initialFrameRate = requested === 'off' && carGraphicsBalanced() ? 60 : requested;
     if (initialFrameRate === 'off') {
         restoreGlobalVisualizerFrameRateLimiter();
         return;

@@ -1,3 +1,5 @@
+import { installGlobalVisualizerFrameRateLimiter } from '../utils/frameRateLimiter';
+import { useCarSettings } from '../stores/useCarSettings';
 import { useEffect } from 'react';
 import { isCapacitorAndroid } from '../platform/runtime';
 
@@ -6,6 +8,9 @@ export const useCapacitorSystemBars = (_isDaylight: boolean): void => {
   useEffect(() => {
     if (!isCapacitorAndroid()) return;
     document.documentElement.dataset.runtime = 'capacitor-android';
-    return () => { delete document.documentElement.dataset.runtime; };
+    const stop = useCarSettings.subscribe((state, previous) => {
+      if (state.balancedGraphics !== previous.balancedGraphics) installGlobalVisualizerFrameRateLimiter();
+    });
+    return () => { stop(); delete document.documentElement.dataset.runtime; };
   }, []);
 };

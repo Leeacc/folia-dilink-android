@@ -15,19 +15,27 @@ import {
   getBrowserCacheUsageByCategory,
   getCacheKeysByPrefix,
   putCacheEntry,
+  readCacheEntriesByKey,
   readCacheEntriesByPrefix,
   readCacheEntry,
   removeCacheEntries,
   removeCacheEntriesByPrefix,
   removeCacheEntry,
   type CacheCategory,
+  type CacheTableName,
 } from './repositories/cacheRepository';
 import {
+  readLocalSong,
   readLocalSongs,
 } from './repositories/localSongRepository';
 import { clearSessionValues, putSessionValue, readSession } from './repositories/sessionRepository';
 import { readThemeRegistryEntries, writeThemeRegistryEntries } from './repositories/themeRegistryRepository';
 import { clearCoverAssets, getCoverAssetUsage } from './binaryAssetStore';
+import { clearLocalCoverBinaries } from './localCoverBinaryStore';
+import {
+  cancelLocalCoverAssetMigration,
+  resetLocalCoverAssetRuntime,
+} from './localCoverAssetService';
 
 // src/services/db.ts
 // Keeps the historical storage API stable while delegating every IndexedDB operation to Dexie repositories.
@@ -94,6 +102,18 @@ export const getCacheEntriesByPrefix = async <T>(prefix: string): Promise<Array<
   }
 };
 
+export const getCacheEntriesByKey = async <T>(
+  predicate: (key: string) => boolean,
+  tableNames?: CacheTableName[],
+): Promise<Array<{ key: string; data: T; timestamp: number }>> => {
+  try {
+    return await readCacheEntriesByKey<T>(predicate, tableNames);
+  } catch (error) {
+    console.error('Cache key scan failed', error);
+    return [];
+  }
+};
+
 export const getFromCacheWithMigration = async <T>(
   key: string,
   migrate: (data: T) => MigrationResult<T>,
@@ -147,6 +167,7 @@ export const getCacheUsageByCategory = async (): Promise<{
   lyrics: number;
   cover: number;
   media: number;
+  analysis: number;
   mediaCount: number;
 }> => {
   try {
@@ -161,7 +182,7 @@ export const getCacheUsageByCategory = async (): Promise<{
     usage.cover += await getCoverAssetUsage();
     return usage;
   } catch {
-    return { playlist: 0, lyrics: 0, cover: 0, media: 0, mediaCount: 0 };
+    return { playlist: 0, lyrics: 0, cover: 0, media: 0, analysis: 0, mediaCount: 0 };
   }
 };
 
@@ -178,21 +199,13 @@ export const clearCacheByCategory = async (category: CacheCategory): Promise<voi
 };
 
 export const saveLocalSong = async (song: LocalSong): Promise<void> => {
-  try {
-    await ensureLocalLibraryInitialized();
-    await assignImportedSongs([song]);
-  } catch (error) {
-    console.error('Failed to save local song', error);
-  }
+  await ensureLocalLibraryInitialized();
+  await assignImportedSongs([song]);
 };
 
 export const saveLocalSongs = async (songs: LocalSong[]): Promise<void> => {
-  try {
-    await ensureLocalLibraryInitialized();
-    await assignImportedSongs(songs);
-  } catch (error) {
-    console.error('Failed to save local songs', error);
-  }
+  await ensureLocalLibraryInitialized();
+  await assignImportedSongs(songs);
 };
 
 export const getLocalSongs = async (): Promise<LocalSong[]> => {
@@ -202,6 +215,20 @@ export const getLocalSongs = async (): Promise<LocalSong[]> => {
   } catch (error) {
     console.error('Failed to get local songs', error);
     return [];
+  }
+};
+
+/**
+ * 按 id 读一首本地歌曲的最新记录。
+ * 不走 ensureLocalLibraryInitialized：那一步会把 local_music 和 assignments 整表读一遍，
+ * 而这里只服务切歌、匹配写回这类「只关心一首」的热路径。读失败或记录不存在时返回 undefined。
+ */
+export const getLocalSong = async (id: string): Promise<LocalSong | undefined> => {
+  try {
+    return await readLocalSong(id);
+  } catch (error) {
+    console.error('Failed to get local song', error);
+    return undefined;
   }
 };
 
@@ -225,6 +252,9 @@ export const clearAllData = async (): Promise<void> => {
   try {
     if (hasElectronAudioCacheBridge()) await window.electron!.clearAudioCache();
     await clearCoverAssets();
+    await cancelLocalCoverAssetMigration();
+    await clearLocalCoverBinaries();
+    resetLocalCoverAssetRuntime();
     await appDatabase.delete();
     await appDatabase.open();
   } catch (error) {

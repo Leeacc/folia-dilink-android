@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const http = require('node:http');
+const { requestQqRpc } = require('./qqRpc.cjs');
 const { searchQq } = require('./qqSearch.cjs');
 
 // Embed the desktop QQ API behind Folia's authenticated loopback bridge, without a second listener.
@@ -38,7 +39,7 @@ function serveQq(req, res, stateDir) {
 }
 
 // Every request is routed through the existing private listener and token; credentials never reach a LAN port.
-function requestQq(endpoint, stateDir, port, token) {
+function requestQq(endpoint, stateDir, port, token, method = 'GET', payload = '') {
     loadQq(stateDir);
     const parsed = new URL(endpoint, 'http://localhost');
     const route = '/' + parsed.pathname.split('/')[1];
@@ -46,6 +47,7 @@ function requestQq(endpoint, stateDir, port, token) {
         '/login',
         '/logout',
         '/user',
+        '/recommend',
         '/getMusicPlay',
         '/getSongListDetail',
         '/getSongInfo',
@@ -54,12 +56,17 @@ function requestQq(endpoint, stateDir, port, token) {
         '/getSingerHotsong',
         '/getSearchByKey',
         '/getLyric',
+        '/getFoliaRpc',
     ]);
     if (!allowed.has(route)) throw new Error('Unsupported QQ route');
+    if (parsed.pathname === '/getFoliaRpc') {
+        if (method !== 'POST') throw new Error('Lyric RPC requires POST');
+        return requestQqRpc(payload);
+    }
     if (parsed.pathname === '/getSearchByKey') return searchQq(parsed.searchParams);
     return new Promise((resolve, reject) => {
-        const request = http.get(
-            { hostname: '127.0.0.1', port, path: '/qq' + endpoint, headers: { 'X-Folia-Token': token } },
+        const request = http.request(
+            { hostname: '127.0.0.1', port, path: '/qq' + endpoint, method, headers: { 'X-Folia-Token': token, 'Content-Type': 'application/json' } },
             (response) => {
                 let body = '';
                 response.on('data', (chunk) => {
@@ -77,6 +84,7 @@ function requestQq(endpoint, stateDir, port, token) {
         );
         request.setTimeout(65000, () => request.destroy(new Error('QQ request timed out')));
         request.on('error', reject);
+        request.end(method === 'POST' ? payload : undefined);
     });
 }
 module.exports = { serveQq, requestQq };

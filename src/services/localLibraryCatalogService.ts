@@ -16,6 +16,7 @@ import { appDatabase } from './appDatabase';
 import { createLocalLibraryAssignment, resolveEntityNames } from './localLibraryCatalogInternals';
 import { assignImportedSongs } from './localLibraryImportCatalog';
 import { sanitizeLocalSongForStorage } from './repositories/localSongRepository';
+import { deleteUnreferencedLocalCoverAssets } from './localCoverAssetService';
 
 // src/services/localLibraryCatalogService.ts
 // Applies every song/entity/assignment mutation in a single Dexie transaction.
@@ -46,6 +47,8 @@ export const applyMatchedMetadata = async (
     songPatch?: Partial<LocalSong>;
     protectOrigins?: LocalLibraryAssignmentOrigin[];
     assignmentOrigin?: Extract<LocalLibraryAssignmentOrigin, 'auto-match' | 'manual-match'>;
+    /** 自动匹配写回用：库里这首已被用户标记为纯音乐（匹配途中刚标上的也算）时整次不写，原样返回。 */
+    skipIfMarkedPureMusic?: boolean;
   } = {},
 ): Promise<LocalSong | undefined> => {
   return await appDatabase.transaction(
@@ -54,6 +57,7 @@ export const applyMatchedMetadata = async (
     async () => {
       const song = await appDatabase.local_music.get(songId);
       if (!song) return undefined;
+      if (options.skipIfMarkedPureMusic && song.markedPureMusic) return song;
       const updatedSong: LocalSong = { ...song, ...options.songPatch };
       const assignmentOrigin = options.assignmentOrigin || 'auto-match';
       if (metadata.source) {
@@ -209,13 +213,19 @@ const collectOrphanedEntityIds = (
 const deleteSongRecords = async (songIds: string[]): Promise<void> => {
   const uniqueSongIds = Array.from(new Set(songIds));
   if (uniqueSongIds.length === 0) return;
+  let deletedCoverAssetIds: string[] = [];
 
   await appDatabase.transaction(
     'rw',
-    [appDatabase.local_music, appDatabase.local_library_entities, appDatabase.local_library_assignments],
+    [
+      appDatabase.local_music,
+      appDatabase.local_library_entities,
+      appDatabase.local_library_assignments,
+    ],
     async () => {
       const deletedSongIdSet = new Set(uniqueSongIds);
-      const [deletedAssignments, assignments, entities] = await Promise.all([
+      const [deletedSongs, deletedAssignments, assignments, entities] = await Promise.all([
+        appDatabase.local_music.bulkGet(uniqueSongIds),
         appDatabase.local_library_assignments.bulkGet(uniqueSongIds),
         appDatabase.local_library_assignments.toArray(),
         appDatabase.local_library_entities.toArray(),
@@ -225,6 +235,7 @@ const deleteSongRecords = async (songIds: string[]): Promise<void> => {
         assignments.filter(assignment => !deletedSongIdSet.has(assignment.songId)),
         entities,
       );
+      deletedCoverAssetIds = deletedSongs.flatMap(song => song?.localCoverAssetId ? [song.localCoverAssetId] : []);
 
       await Promise.all([
         appDatabase.local_music.bulkDelete(uniqueSongIds),
@@ -233,6 +244,7 @@ const deleteSongRecords = async (songIds: string[]): Promise<void> => {
       ]);
     },
   );
+  await deleteUnreferencedLocalCoverAssets(deletedCoverAssetIds);
 };
 
 export const deleteSongAssignment = async (songId: string): Promise<void> => deleteSongRecords([songId]);

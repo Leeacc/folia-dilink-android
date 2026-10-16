@@ -1,7 +1,12 @@
+import { hasEmbeddedMusic, requestEmbeddedMusic } from './embeddedMusic';
 import { NeteaseUser, NeteasePlaylist, NoCopyrightRecommendation, SongPrivilege, SongResult } from "../types";
 import { readProviderSessionValue, removeProviderSessionValue, writeProviderSessionValue } from './onlineMusic/providerStorage';
-
-import { hasEmbeddedMusic, requestEmbeddedMusic } from './embeddedMusic';
+import type { PersonalFmRequestOptions } from '../types/onlineMusic';
+import {
+  isNeteaseRouteMissingResponse,
+  NETEASE_API_BASE_MISSING,
+  neteaseUpstreamNetworkError,
+} from './onlineMusic/neteasePlaybackFailure';
 
 type UnavailableSongReplacement = {
   replacementSong: SongResult;
@@ -37,17 +42,63 @@ const getConfiguredApiBase = () => {
   return null;
 };
 
-export const isNeteaseApiConfigured = (): boolean => hasEmbeddedMusic() || isElectronRuntime() || Boolean(getConfiguredApiBase());
+/** 网页版配置的远端 API 地址（自检与诊断报告用）；桌面版走内嵌后端，返回 null。 */
+export const getNeteaseRemoteApiBase = (): string | null => (isElectronRuntime() ? null : getConfiguredApiBase());
+
+// Thrown (as the error's `code`, and at the start of its message) when the Electron backend is not
+// listening, so it stays distinguishable from an ordinary request failure. The message carries the
+// backend's own status and error, which is what the QR login timeline needs to say why.
+export const NETEASE_API_UNAVAILABLE = 'NETEASE_API_UNAVAILABLE';
+
+const NETEASE_PORT_POLL_INTERVAL_MS = 250;
+// Backstop only. The main process bounds every startup network call, so `starting` always resolves
+// well inside this; the deadline exists so a wedged backend cannot hang a request forever.
+const NETEASE_PORT_WAIT_TIMEOUT_MS = 45000;
+
+const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+// The Electron backend no longer blocks window creation, so the renderer can outrun it. Wait while
+// it is still starting, but return null the moment it reports a failure — the login modal turns
+// that into a restart button rather than another opaque request error.
+const waitForNeteasePort = async (bridge: any): Promise<{ port: number | null; status: ElectronNeteaseApiStatus | null }> => {
+  const deadline = Date.now() + NETEASE_PORT_WAIT_TIMEOUT_MS;
+
+  for (;;) {
+    const port = await bridge.getNeteasePort();
+    if (Number.isInteger(port) && port > 0) return { port, status: null };
+
+    const status = typeof bridge.getNeteaseApiStatus === 'function'
+      ? await bridge.getNeteaseApiStatus()
+      : null;
+    if (status?.status !== 'starting' || Date.now() >= deadline) return { port: null, status };
+
+    await delay(NETEASE_PORT_POLL_INTERVAL_MS);
+  }
+};
+
+export const isNeteaseApiConfigured = () => hasEmbeddedMusic() || isElectronRuntime() || Boolean(getConfiguredApiBase());
 
 const getApiBase = async () => {
   if (hasEmbeddedMusic()) return 'https://embedded.invalid';
-  if (API_BASE) return API_BASE;
-
+  // Deliberately uncached under Electron: the local server starts asynchronously and can be
+  // restarted from the login modal on a fresh port. Caching the first answer used to pin the
+  // renderer to the dead default port for the rest of the session, so every online feature kept
+  // failing with a bare network error long after the backend recovered.
   if (isElectronRuntime()) {
-    const port = await getElectronBridge().getNeteasePort();
-    API_BASE = `http://localhost:${port}`;
-    return API_BASE;
+    const { port, status } = await waitForNeteasePort(getElectronBridge());
+    if (port === null) {
+      const state = status?.status ?? 'unknown';
+      throw Object.assign(
+        new Error(`${NETEASE_API_UNAVAILABLE}: local NetEase API is ${state}${status?.error ? ` (${status.error})` : ''}`),
+        { code: NETEASE_API_UNAVAILABLE },
+      );
+    }
+    // 必须是 127.0.0.1 而不是 localhost：本地 API 只监听 IPv4 回环（见 electron/main.cjs 的 startApi），
+    // 有公网 IPv6 的机器上 localhost 会先解析到 ::1。
+    return `http://127.0.0.1:${port}`;
   }
+
+  if (API_BASE) return API_BASE;
 
   const configuredApiBase = getConfiguredApiBase();
   if (configuredApiBase) {
@@ -55,15 +106,17 @@ const getApiBase = async () => {
     return API_BASE;
   }
 
-  throw new Error("Failed to access environment variables for API base. Please configure VITE_NETEASE_API_BASE.");
+  // code 标签让 provider 认出“未配置”（持久，不是暂时失败）；message 原文不变，诊断依赖它。
+  throw Object.assign(
+    new Error("Failed to access environment variables for API base. Please configure VITE_NETEASE_API_BASE."),
+    { code: NETEASE_API_BASE_MISSING },
+  );
 };
 
-const musicJson = async (url: string, options?: RequestInit) => {
-  if (hasEmbeddedMusic()) {
-    const parsed = new URL(url);
-    return requestEmbeddedMusic('netease', parsed.pathname + parsed.search);
-  }
-  return fetch(url, options).then(response => response.json());
+const musicJson = async (url: string) => {
+  if (!hasEmbeddedMusic()) return (await fetch(url)).json();
+  const parsed = new URL(url);
+  return requestEmbeddedMusic('netease', parsed.pathname + parsed.search);
 };
 
 const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
@@ -124,7 +177,33 @@ const fetchWithCreds = async (endpoint: string, options: RequestInit = {}) => {
     finalUrl = `${finalUrl}${sep}cookie=${encodeURIComponent(cookieToUse)}`;
   }
 
-  const data = await musicJson(finalUrl, { ...defaultOptions, credentials: 'include' });
+  const target = endpoint.split('?')[0];
+  let res: Response;
+  try {
+    res = hasEmbeddedMusic()
+      ? new Response(JSON.stringify(await requestEmbeddedMusic('netease', new URL(finalUrl).pathname + new URL(finalUrl).search, defaultOptions)))
+      : await fetch(finalUrl, { ...defaultOptions, credentials: 'include' });
+  } catch (error) {
+    // 连 API 本身都没连上（本地后端退出、远端 API 不可达），不是网易上游的失败：说清是哪个接口，原始错误挂在 cause 上。
+    // networkFailure 标签供 provider 归为 network；message 原文不变，二维码诊断依赖它。
+    throw Object.assign(
+      new Error(`NetEase API request ${target} failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error }),
+      { networkFailure: true },
+    );
+  }
+  // 照旧不看 HTTP 状态（错误也以 JSON 的 code 返回，调用方看 code）；只是正文不是 JSON 时，
+  // 报出状态码与正文开头，而不是一句看不出来源的 SyntaxError。
+  const body = await res.text();
+  let data: any;
+  try {
+    data = JSON.parse(body);
+  } catch {
+    // httpStatus 标签供 provider 区分服务异常（≥500）与形态错误（<500）。
+    throw Object.assign(
+      new Error(`NetEase API ${target} returned HTTP ${res.status} without a JSON body: ${body.slice(0, 200) || '(empty)'}`),
+      { httpStatus: res.status },
+    );
+  }
 
   if (!storedCookie && cookieToUse && (data?.code === 301 || data?.code === 401 || data?.code === 403)) {
     removeProviderSessionValue('netease', 'anonymous_cookie', ['netease_anonymous_cookie']);
@@ -411,9 +490,32 @@ const getSongDetail = async (ids: number[] | number) => {
   return res;
 };
 
-const getSongCopyrightRecommendation = async (songId: number) => {
-  const result = await fetchWithCreds(`/song/copyright/rcmd?songid=${songId}`);
-  return normalizeUnavailableSongReplacement(result);
+// 先看原始响应：只有路由缺失（routeMissing）才算接口不支持；上游网络失败抛 OmniError，
+// 不当成“没有替代版本”。
+// 路由缺失有两种形态：部署里真的没有这个路由时，Express 默认回 HTML 404（Cannot GET ...），不是 JSON，
+// fetchWithCreds 解析失败会打上 httpStatus 404 的标签；以及本地 API 的 Not Found JSON 形态。
+const getSongCopyrightRecommendation = async (
+  songId: number
+): Promise<{ replacement: UnavailableSongReplacement | null; routeMissing: boolean }> => {
+  let result: any;
+  try {
+    result = await fetchWithCreds(`/song/copyright/rcmd?songid=${songId}`);
+  } catch (error) {
+    if ((error as { httpStatus?: unknown } | null)?.httpStatus === 404) {
+      return { replacement: null, routeMissing: true };
+    }
+    throw error;
+  }
+  if (isNeteaseRouteMissingResponse(result)) {
+    return { replacement: null, routeMissing: true };
+  }
+
+  const upstreamError = neteaseUpstreamNetworkError(result, 'replacement');
+  if (upstreamError) {
+    throw upstreamError;
+  }
+
+  return { replacement: normalizeUnavailableSongReplacement(result), routeMissing: false };
 };
 
 // Resolves an alternate playable song while keeping legacy APIs as the primary path.
@@ -453,8 +555,9 @@ const getUnavailableSongReplacement = async (
     return null;
   }
 
+  let recommendationError: unknown = null;
   try {
-    const replacement = await getSongCopyrightRecommendation(Number(song.id));
+    const { replacement, routeMissing } = await getSongCopyrightRecommendation(Number(song.id));
     if (replacement) {
       songCopyrightRecommendationApiSupported = true;
       return {
@@ -463,17 +566,20 @@ const getUnavailableSongReplacement = async (
       };
     }
 
-    if (!isElectronRuntime()) {
+    // 只有路由缺失才在本会话内关掉这个查询；一次网络失败或没有替代版本都不算接口不支持。
+    if (routeMissing && !isElectronRuntime()) {
       songCopyrightRecommendationApiSupported = false;
     }
-  } catch {
-    if (!isElectronRuntime()) {
-      songCopyrightRecommendationApiSupported = false;
-    }
+  } catch (error) {
+    recommendationError = error;
   }
 
   if (detailError) {
     throw detailError;
+  }
+
+  if (recommendationError) {
+    throw recommendationError;
   }
 
   return null;
@@ -551,6 +657,30 @@ export const neteaseApi = {
   // --- User Data ---
   likeSong: async (id: number, like = true) => {
     return fetchWithCreds(`/like?id=${id}&like=${like}`);
+  },
+
+  /**
+   * 听歌打卡 (NCBL 加密日志版)。写用户账号，只应在真实播放之后调用一次。
+   *
+   * `sourceid` 是可选的，这里刻意不发：应用里没有"这条队列来自哪个歌单"的记录，凑一个来源等于
+   * 上报假数据。`source` 同样留给服务端默认值。
+   */
+  scrobbleV1: async (params: {
+    id: number;
+    time: number;
+    name?: string;
+    artist?: string;
+    level?: string;
+    bitrate?: number;
+    total?: number;
+  }) => {
+    const query = new URLSearchParams({ id: String(params.id), time: String(params.time) });
+    if (params.name) query.set('name', params.name);
+    if (params.artist) query.set('artist', params.artist);
+    if (params.level) query.set('level', params.level);
+    if (params.bitrate) query.set('bitrate', String(params.bitrate));
+    if (params.total) query.set('total', String(params.total));
+    return fetchWithCreds(`/scrobble/v1?${query.toString()}`);
   },
 
   getLikedSongs: async (uid: number) => {
@@ -738,8 +868,36 @@ export const neteaseApi = {
   },
 
   // --- Radio ---
-  getPersonalFm: async () => {
-    return fetchWithCreds(`/personal_fm?timestamp=${Date.now()}`);
+  // `/personal/fm/mode` only exists on newer NeteaseCloudMusicApi builds, and this app talks to
+  // whatever instance the user configured. The default mode keeps using the long-standing
+  // `/personal_fm`, and an instance that cannot serve a mode falls back to it instead of leaving
+  // the radio empty.
+  //
+  // Do not add `limit`: the module accepts one and forwards it, but the upstream radio ignores it
+  // and returns 3 tracks either way (measured). The queue controller's near-end refill is what
+  // keeps the stream going, exactly as it does for the plain FM endpoint.
+  getPersonalFm: async (options?: PersonalFmRequestOptions) => {
+    const fetchDefaultFm = () => fetchWithCreds(`/personal_fm?timestamp=${Date.now()}`);
+    const mode = options?.mode;
+    if (!mode || mode === 'DEFAULT') {
+      return fetchDefaultFm();
+    }
+
+    const params = new URLSearchParams({ mode });
+    if (mode === 'SCENE_RCMD' && options?.submode) {
+      params.set('submode', options.submode);
+    }
+
+    try {
+      const res = await fetchWithCreds(`/personal/fm/mode?${params.toString()}&timestamp=${Date.now()}`);
+      if (Array.isArray(res?.data) && res.data.length > 0) {
+        return res;
+      }
+      console.warn('[Netease] personal fm mode unsupported, falling back', { mode, code: res?.code });
+    } catch (error) {
+      console.warn('[Netease] personal fm mode request failed, falling back', { mode, error });
+    }
+    return fetchDefaultFm();
   },
 
   getDailyRecommendedSongs: async (afresh = false) => {

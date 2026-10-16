@@ -1,3 +1,4 @@
+import { carSpectrum } from '../../services/android/spectrum';
 import { useState } from 'react';
 import { carMedia } from '../../services/android/carMedia';
 import { useTranslation } from 'react-i18next';
@@ -49,6 +50,17 @@ export default function CarPlaybackSettings() {
                     checked={preferences.balancedGraphics}
                     onChange={(event) => preferences.setPreference('balancedGraphics', event.target.checked)}
                 />
+            </label>
+            <label className="flex flex-col gap-2">
+                <span>{t('car.spectrum')}</span>
+                <span className="text-xs opacity-60">{t('car.spectrumHint')}</span>
+                <button type="button" className="px-3 py-2 rounded-lg bg-white/10" onClick={async () => {
+                    if (preferences.spectrumEnabled) preferences.setPreference('spectrumEnabled', false);
+                    else {
+                        const result = await carSpectrum.permission().catch(() => ({granted: false}));
+                        preferences.setPreference('spectrumEnabled', result.granted);
+                    }
+                }}>{t(preferences.spectrumEnabled ? 'car.disableSpectrum' : 'car.enableSpectrum')}</button>
             </label>
             <p className="text-xs opacity-60">{t('car.gestureHint')}</p>
             <button

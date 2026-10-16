@@ -1,8 +1,9 @@
-name: Build DiLink test APK
+name: Build and verify DiLink Android
 
 on:
   push:
-    branches: [main]
+    branches: [main, "migration/**", "upstream/**"]
+    tags: ["v*-dilink.*"]
   workflow_dispatch:
     inputs:
       apk_run_id:
@@ -10,18 +11,24 @@ on:
         required: false
         type: string
 
+      runtime_probe:
+        description: 'Diagnostic only: overlay current JS music runtime in a disposable debug emulator; never publish'
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: android-${{ github.ref }}-${{ inputs.apk_run_id && 'verify' || 'build' }}
   cancel-in-progress: true
 
 jobs:
   build:
     if: ${{ !inputs.apk_run_id }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
@@ -47,39 +54,63 @@ jobs:
         run: sdkmanager 'platforms;android-36.1' 'build-tools;36.0.0' 'platform-tools' 'ndk;27.2.12479018' 'cmake;3.22.1'
       - name: Install locked dependencies
         run: npm ci --no-audit --no-fund
-      - name: Test Android runtime and API routing
-        run: npm run test:unit -- test/unit/platform/runtime.test.ts test/unit/services/webApi.test.ts test/unit/services/loginTimeout.test.ts test/unit/services/androidMedia.test.ts test/unit/onlineMusic/audioUrlNormalization.test.ts test/unit/onlineMusic/neteaseProvider.test.ts test/unit/onlineMusic/qqAndroidProvider.test.ts test/unit/onlineMusic/qqAndroidTransport.test.ts test/unit/hooks/useQqLibrary.test.ts test/unit/platform/carInteractions.test.ts
+      - name: Typecheck and unit tests
+        run: |
+          npm run typecheck
+          npm run test:unit
       - name: Test QQ search protocol regression
-        run: node --test ci/test-qq-search.cjs
+        run: node --test ci/test-qq-search.cjs ci/test-qq-rpc.cjs ci/test-mobile-compat.cjs ci/test-private-storage.cjs
       - name: Test native audio media-element boundary
         run: npm run test:unit -- test/unit/platform/nativeAudio.test.ts
       - name: Build and sync original Folia UI
         run: npm run cap:sync:android
+      - name: Compile isolated UI fixtures for Chromium 95
+        run: FOLIA_UI_PROBES=1 npm run build:capacitor -- --outDir probe-dist
       - name: Verify compiled UI on Chromium 95
         run: |
           npm install --prefix "$RUNNER_TEMP/legacy-pw" --ignore-scripts --no-audit --no-fund playwright@1.15.2
           curl -fL --retry 3 https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/918973/chromium-linux.zip -o "$RUNNER_TEMP/chromium95.zip"
           unzip -q "$RUNNER_TEMP/chromium95.zip" -d "$RUNNER_TEMP/chromium95"
           npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/preview.log" 2>&1 &
+          npm run preview -- --host 127.0.0.1 --port 4191 --outDir probe-dist > "$RUNNER_TEMP/probes.log" 2>&1 &
           sleep 3
-          FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-chromium95.cjs
+          FOLIA_REQUIRE_CHROMIUM95=1 FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-major-ui.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: chromium95-ui-check
-          path: artifacts/chromium95/
+          path: |
+            artifacts/chromium95/
+            artifacts/major-ui/
           if-no-files-found: ignore
       - name: Package embedded music runtime
         run: python3 mobile/prepare.py
-      - name: Assemble debug APK
+      - name: Restore persistent Android signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.FOLIA_ANDROID_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.FOLIA_ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          python3 - <<'PYTHON'
+          import os,base64,pathlib
+          key=pathlib.Path(os.environ['RUNNER_TEMP'])/'folia-release.p12'
+          key.write_bytes(base64.b64decode(os.environ['KEYSTORE_B64']))
+          key.chmod(0o600)
+          pathlib.Path('android/keystore.properties').write_text('storeFile='+str(key)+'\nstorePassword='+os.environ['KEYSTORE_PASSWORD']+'\nkeyAlias=folia-dilink\nkeyPassword='+os.environ['KEYSTORE_PASSWORD']+'\n')
+          PYTHON
+      - name: Assemble signed test and release APK
         working-directory: android
-        run: bash gradlew --no-daemon assembleDebug
+        run: bash gradlew --no-daemon assembleDebug assembleRelease
       - name: Verify and collect APK
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
           cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/folia-dilink-test.apk
+          cp android/app/build/outputs/apk/release/app-release.apk artifacts/folia-dilink.apk
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs artifacts/folia-dilink.apk > artifacts/release-signature.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging artifacts/folia-dilink.apk > artifacts/release-apk-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree artifacts/folia-dilink.apk AndroidManifest.xml > artifacts/release-manifest.txt
+          if grep -F 'android:debuggable' artifacts/release-manifest.txt | grep -F '0xffffffff'; then exit 1; fi
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose artifacts/folia-dilink-test.apk > artifacts/signature.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging artifacts/folia-dilink-test.apk > artifacts/apk-info.txt
           grep -F "name='io.github.leeacc.folia.dilink'" artifacts/apk-info.txt
@@ -90,7 +121,7 @@ jobs:
           unzip -l artifacts/folia-dilink-test.apk | grep 'assets/public/index.html'
           cp UPSTREAM.json artifacts/
           printf '%s\n' "$GITHUB_SHA" > artifacts/BUILD_COMMIT.txt
-          (cd artifacts && sha256sum folia-dilink-test.apk > SHA256SUMS.txt)
+          (cd artifacts && sha256sum folia-dilink.apk folia-dilink-test.apk > SHA256SUMS.txt)
           cat artifacts/apk-info.txt >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
@@ -102,12 +133,12 @@ jobs:
   smoke-test:
     if: ${{ always() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.apk_run_id != '')) }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        api: [29, 35]
+        api: ${{ fromJSON(inputs.runtime_probe && '[35]' || '[29,35]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -125,6 +156,8 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Install and inspect landscape UI
+        env:
+          FOLIA_RUNTIME_PROBE: ${{ inputs.runtime_probe && '1' || '0' }}
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -141,3 +174,27 @@ jobs:
             artifacts/*.png
             artifacts/*.json
           retention-days: 30
+
+  publish:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.runtime_probe }}
+    needs: [build, smoke-test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: folia-dilink-test-apk
+          path: artifacts
+      - name: Publish verified signed APK and provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          grep '  folia-dilink.apk$' artifacts/SHA256SUMS.txt > artifacts/release-sha.txt
+          mv artifacts/release-sha.txt artifacts/SHA256SUMS.txt
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'Release already exists; keeping its published assets.'
+            exit 0
+          fi
+          gh release create "$GITHUB_REF_NAME" artifacts/folia-dilink.apk artifacts/SHA256SUMS.txt artifacts/UPSTREAM.json artifacts/BUILD_COMMIT.txt artifacts/release-signature.txt --title "Folia DiLink $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" --prerelease --verify-tag

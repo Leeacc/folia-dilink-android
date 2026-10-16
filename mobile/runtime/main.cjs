@@ -2,7 +2,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { serveQq, requestQq } = require('./qqBridge.cjs');
+const { createPrivateStorage } = require('./privateStorage.cjs');
 const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
+
+require('./compat.cjs').installUtf8DecoderCompat();
 
 // Embedded desktop music adapters. Only the private native bridge can access this loopback endpoint.
 const stateDir = process.argv[2];
@@ -26,6 +29,8 @@ const sessionFile = path.join(stateDir, 'kugou-session.json');
 let session = {};
 try { session = JSON.parse(fs.readFileSync(sessionFile, 'utf8')); } catch {}
 const kugou = createKugouApiBridge({
+  safeStorage: createPrivateStorage(stateDir),
+  platform: 'android',
   store: { get: key => session[key], set: (key, value) => {
     session[key] = value;
     fs.writeFileSync(sessionFile + '.tmp', JSON.stringify(session), { mode: 0o600 });
@@ -39,10 +44,10 @@ const kugou = createKugouApiBridge({
   } }),
 });
 
-async function dispatch(provider, endpoint) {
+async function dispatch(provider, endpoint, method = 'GET', payload = '') {
   if (provider === 'qq') {
-    if (!/^\/(login\/|logout(?:\?|$)|user\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
-    return requestQq(endpoint, stateDir, server.address().port, secret);
+    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
+    return requestQq(endpoint, stateDir, server.address().port, secret, method, payload);
   }
   const url = new URL(endpoint, 'http://localhost');
   const operation = url.pathname.slice(1).replace(/\//g, '_');
@@ -77,13 +82,13 @@ const server = http.createServer(async (req, res) => {
   try {
     let raw = '';
     for await (const chunk of req) { raw += chunk; if (raw.length > 256000) throw new Error('Request too large'); }
-    const { provider, endpoint } = JSON.parse(raw);
-    res.end(JSON.stringify({ data: await dispatch(provider, endpoint) }));
+    const { provider, endpoint, method, payload } = JSON.parse(raw);
+    res.end(JSON.stringify({ data: await dispatch(provider, endpoint, method, payload) }));
   } catch (error) {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;
     if (body) res.end(JSON.stringify({ data: body }));
-    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64)} })); }
+    else { res.end(JSON.stringify({ data: {code:502, file:error?.path ? path.basename(error.path) : undefined, diagnostic: String(error?.code || error?.name || 'UNKNOWN').replace(/[^A-Za-z0-9_]/g, '').slice(0,64), upstreamCode: error?.errorCode, httpStatus: error?.status, detail: error?.name === 'KuGouApiError' ? String(error.message).replace(/https?:\S+/g, '[url]').replace(/[A-Za-z0-9_-]{24,}/g,'[redacted]').slice(0,200) : undefined, frames: String(error?.stack || '').split('\n').slice(1,7).map(line => line.match(/([A-Za-z0-9_.-]+\.[cm]?js):(\d+):(\d+)/)?.[0]).filter(Boolean)} })); }
   }
 });
 server.listen(0, '127.0.0.1', () => {

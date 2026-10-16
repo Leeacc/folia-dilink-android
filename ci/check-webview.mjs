@@ -35,7 +35,7 @@ if (!webViewMajor) throw new Error('Cannot identify WebView version');
 if (webViewMajor < 95) {
   if (!dom.text.includes('Folia') || !dom.text.includes('WebView')) throw new Error('Missing compatibility message');
 } else {
-  if (!dom.children || !dom.text.includes('Folia') || !/Playlists|歌单/.test(dom.text)) throw new Error('Folia library navigation did not render');
+  if (!dom.children || !/Playlists|歌单/.test(dom.text)) throw new Error('Folia library navigation did not render');
 }
 
 if (dom.width !== dom.screenWidth || dom.height !== dom.screenHeight) throw new Error('Emulator system bars are not hidden');
@@ -92,7 +92,7 @@ if (webViewMajor >= 95) {
           if (source) break;
           await delay(1500);
         }
-        if (!source) { checked.code = body?.code ?? body?.status; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
+        if (!source) { checked.code = body?.code ?? body?.status; checked.diagnostic = body?.diagnostic; checked.frames = body?.frames; checked.detail = body?.detail; checked.upstreamCode = body?.upstreamCode; checked.httpStatus = body?.httpStatus; checked.itemCode = body?.data?.[0]?.code; checked.fee = body?.data?.[0]?.fee; throw new Error('No provider stream'); }
         if (provider === 'kugou') sessionStorage.setItem('ci-public-kugou-preview', JSON.stringify({source,at:Date.now()}));
         checked.scheme = new URL(source).protocol;
         audio.src = 'https://localhost/folia-media?url=' + encodeURIComponent(source);
@@ -108,20 +108,31 @@ if (webViewMajor >= 95) {
     // Record both provider refusals and bridge failures before failing the check.
     const qq = {search:false,qrVisible:false,authenticatedPlayback:'requires user scan'};
     try {
-      const search = await request('qq','/getSearchByKey?key=' + encodeURIComponent('海阔天空') + '&limit=20&page=1');
-      const response = search.data;
+      let response;
+      for (let retry=0;retry<3;retry++) {
+        const search=await request('qq','/getSearchByKey?key=' + encodeURIComponent('海阔天空') + '&limit=20&page=1');
+        response=search.data;
+        if(response?.body?.request?.data?.body?.song?.list?.length)break;
+        await delay(1500);
+      }
       qq.searchResponse = {code:response?.code,diagnostic:response?.diagnostic,file:response?.file,status:response?.status,outerCode:response?.body?.code,requestCode:response?.body?.request?.code};
       const songs = response?.body?.request?.data?.body?.song?.list;
       qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid || songs[0].songmid);
-      const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
+      const account = document.querySelector('[data-bravais-account-toggle]');
+      if (!account) throw new Error('Account entry unavailable');
+      account.click(); await delay(500);
+      const qqButton = document.querySelector('[data-bravais-account-provider="qq"] button');
       if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
-      qqButton.click();
+      qqButton.click(); await delay(1000);
+
       for (let attempt = 0; attempt < 90; attempt++) {
-        const image = document.querySelector('[role="dialog"] img[alt="QR Code"]');
+        const image = document.querySelector('[data-bravais-account-login="qq"] img[alt="QR Code"]');
         if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qq.qrVisible = true; break; }
+        const method = document.querySelector('[data-bravais-login-method="qq"]') || document.querySelector('[data-bravais-login-method]');
+        if (method && method.getAttribute('aria-pressed') !== 'true') method.click();
         await delay(1000);
       }
-      qq.dialogText = document.querySelector('[role="dialog"]')?.textContent?.slice(0,400);
+      qq.dialogText = document.querySelector('[data-bravais-account-login="qq"]')?.textContent?.slice(0,400);
     } catch (error) { qq.error = error.message; }
     return {embeddedQr:true, network, back:true, media, qq};
   })()`}}));

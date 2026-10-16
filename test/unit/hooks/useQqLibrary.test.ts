@@ -43,13 +43,14 @@ const createDeps = (overrides: Partial<QqLibraryRefreshDeps> = {}): QqLibraryRef
     ...overrides,
 });
 
-const patchesFrom = (updateAccount: QqLibraryRefreshDeps['updateAccount']): Partial<OnlineProviderAccountState>[] =>
-    vi.mocked(updateAccount).mock.calls.map(([patch]) => patch);
+const patchesFrom = (updateAccount: QqLibraryRefreshDeps['updateAccount']): Partial<OnlineProviderAccountState>[] => (
+    vi.mocked(updateAccount).mock.calls.map(([patch]) => patch)
+);
 
 describe('useQqLibrary refresh', () => {
     beforeEach(() => {
-        vi.spyOn(console, 'info').mockImplementation(() => {});
-        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        vi.spyOn(console, 'info').mockImplementation(() => { });
+        vi.spyOn(console, 'warn').mockImplementation(() => { });
     });
 
     it('marks the account anonymous without contacting the backend when the API base is not configured', async () => {
@@ -60,15 +61,13 @@ describe('useQqLibrary refresh', () => {
         expect(deps.checkLoginStatus).not.toHaveBeenCalled();
         expect(deps.loadLikedSongIds).not.toHaveBeenCalled();
         expect(deps.loadPlaylistPage).not.toHaveBeenCalled();
-        expect(patchesFrom(deps.updateAccount)).toEqual([
-            {
-                status: 'anonymous',
-                user: null,
-                error: 'not-configured',
-                hydration: 'ready',
-                freshness: 'fresh',
-            },
-        ]);
+        expect(patchesFrom(deps.updateAccount)).toEqual([{
+            status: 'anonymous',
+            user: null,
+            error: 'not-configured',
+            hydration: 'ready',
+            freshness: 'fresh',
+        }]);
     });
 
     it('treats a profile with no nickname and no account id as authenticated', async () => {
@@ -105,33 +104,25 @@ describe('useQqLibrary refresh', () => {
         expect(deps.loadPlaylistPage).not.toHaveBeenCalled();
         expect(deps.saveSnapshot).not.toHaveBeenCalled();
         // The cached account keeps its authenticated shell while the status call decides; clearing is the hook's job.
-        expect(patchesFrom(deps.updateAccount)).toEqual([
-            {
-                status: 'authenticated',
-                hydration: 'ready',
-                freshness: 'refreshing',
-                error: undefined,
-            },
-        ]);
+        expect(patchesFrom(deps.updateAccount)).toEqual([{
+            status: 'authenticated',
+            hydration: 'ready',
+            freshness: 'refreshing',
+            error: undefined,
+        }]);
     });
 
     it('walks every playlist page until the provider reports no more local rows', async () => {
-        const loadPlaylistPage = vi
-            .fn()
+        const loadPlaylistPage = vi.fn()
             .mockResolvedValueOnce({ items: [collection(7, '我喜欢')], hasMore: true, nextOffset: 50 })
             .mockResolvedValueOnce({ items: [collection(8, '收藏')], hasMore: false, nextOffset: 51 });
         const deps = createDeps({ loadPlaylistPage });
 
         await expect(refreshQqLibraryAccount(deps)).resolves.toBe(true);
 
-        expect(loadPlaylistPage.mock.calls).toEqual([
-            ['', 50, 0],
-            ['', 50, 50],
-        ]);
-        expect(patchesFrom(deps.updateAccount).at(-1)?.collections).toEqual([
-            collection(7, '我喜欢'),
-            collection(8, '收藏'),
-        ]);
+        expect(loadPlaylistPage.mock.calls).toEqual([['', 50, 0], ['', 50, 50]]);
+        expect(patchesFrom(deps.updateAccount).at(-1)?.collections)
+            .toEqual([collection(7, '我喜欢'), collection(8, '收藏')]);
     });
 
     it('stops paging when the provider stops advancing its offset', async () => {

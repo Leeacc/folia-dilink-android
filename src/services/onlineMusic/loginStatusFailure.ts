@@ -5,8 +5,9 @@ import type { OnlineProviderId, ProviderUser } from '../../types/onlineMusic';
 // 登录状态检查抛错后的分流：只有 provider 明确报告鉴权失效才清账号，网络类/未知错误保留缓存账号。
 
 /** 把错误翻译成"登录态确实失效"的判断；只认 provider 归一化后的 auth-required。 */
-export const isAuthRequiredFailure = (error: unknown): boolean =>
-    error instanceof OnlineProviderError && error.code === 'auth-required';
+export const isAuthRequiredFailure = (error: unknown): boolean => (
+    error instanceof OnlineProviderError && error.code === 'auth-required'
+);
 
 /** 保留缓存账号时写回账号状态的补丁，不含 user/collections，让缓存账号原样留在 store 里。 */
 export type LoginStatusKeepPatch = {
@@ -53,12 +54,10 @@ export const handleLoginStatusFailure = async (
         providerId,
         hadCachedAccount: Boolean(cachedUser),
         authRequired,
-        ...(providerId === 'qq'
-            ? {}
-            : {
-                  name: error instanceof Error ? error.name : 'Error',
-                  message,
-              }),
+        ...(providerId === 'qq' ? {} : {
+            name: error instanceof Error ? error.name : 'Error',
+            message,
+        }),
     });
     return null;
 };

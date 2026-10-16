@@ -17,9 +17,9 @@ import type { UrlBackgroundItem } from '../types';
 // auto-switch value can also flip "prefer custom theme" — a setting that is not in the config at
 // all and would otherwise change with no warning.
 
-export type ImportGroup = 'theme' | 'visualizer' | 'fonts' | 'background' | 'songTheme';
+export type ImportGroup = 'theme' | 'visualizer' | 'fonts' | 'background' | 'songTheme' | 'trackCard' | 'libraryWall';
 
-export const IMPORT_GROUPS: ImportGroup[] = ['theme', 'visualizer', 'fonts', 'background', 'songTheme'];
+export const IMPORT_GROUPS: ImportGroup[] = ['theme', 'visualizer', 'fonts', 'background', 'songTheme', 'trackCard', 'libraryWall'];
 
 export interface ImportChange {
     group: ImportGroup;
@@ -75,6 +75,8 @@ const FIELD_GROUPS: Record<string, ImportGroup> = {
     showSubtitleTranslation: 'visualizer',
     subtitleContentMode: 'visualizer',
     subtitleOverlayBackground: 'visualizer',
+    subtitleUpcomingLyricsBlur: 'visualizer',
+    subtitleOverlayOpacity: 'visualizer',
     showHarmonySubtitle: 'visualizer',
     harmonySubtitleBackground: 'visualizer',
     visualizerTunings: 'visualizer',
@@ -88,6 +90,9 @@ const FIELD_GROUPS: Record<string, ImportGroup> = {
     dioramaTuning: 'visualizer',
     monetTuning: 'visualizer',
     pendoloTuning: 'visualizer',
+    sonnetTuning: 'visualizer',
+    temperaTuning: 'visualizer',
+    lumiereTuning: 'visualizer',
 
     lyricsFontStyle: 'fonts',
     lyricsFontScale: 'fonts',
@@ -105,14 +110,39 @@ const FIELD_GROUPS: Record<string, ImportGroup> = {
 
     visualizerBackgroundMode: 'background',
     backgroundOpacity: 'background',
+    useCoverColorBg: 'background',
+    disableVisualizerGeometricBackground: 'background',
+    disableVisualizerVignette: 'background',
+    // Static mode is presented under background rather than visualizer: what it actually does is
+    // drop the geometric background to save resources, which is how the settings panel describes it.
+    staticMode: 'background',
     monetBackgroundTuning: 'background',
     nomandBackgroundTuning: 'background',
     latentBackgroundTuning: 'background',
+    soraBackgroundTuning: 'background',
     urlBackgroundList: 'background',
     urlBackgroundSelectedId: 'background',
 
     songThemeAutoSwitchEnabled: 'songTheme',
     songThemeAutoGenerateEnabled: 'songTheme',
+    themeGenerationSource: 'songTheme',
+    followSystemTheme: 'theme',
+
+    // Its own group rather than folded into visualizer: the card is chrome around the picture, not
+    // part of it, and the three rows are read together — someone taking a configuration for its
+    // colours has a reason to leave the card alone, and a reason to take all three of it at once.
+    stageTrackPillMode: 'trackCard',
+    stageTrackPillTimeoutSec: 'trackCard',
+    stageTrackPillOnHome: 'trackCard',
+
+    // The bravais wall's collection stack edges. Its own group: it styles the library wall, not the
+    // picture or the card, and someone taking a look for its colours has a reason to leave it alone.
+    libraryWallStackEdges: 'libraryWall',
+    // The info strip's material and the picture behind the wall: same group, same reason.
+    libraryWallSeamClear: 'libraryWall',
+    libraryWallSeamStyle: 'libraryWall',
+    libraryWallBackdropLyrics: 'libraryWall',
+    libraryWallBackdropBlur: 'libraryWall',
 };
 
 // Fields the import applies only when the incoming value is truthy, so an incoming null means "the
@@ -140,10 +170,19 @@ const TRUTHY_GUARDED_FIELDS = new Set([
     'dioramaTuning',
     'monetTuning',
     'pendoloTuning',
+    'sonnetTuning',
+    'temperaTuning',
+    'lumiereTuning',
     'monetBackgroundTuning',
     'nomandBackgroundTuning',
     'latentBackgroundTuning',
+    'soraBackgroundTuning',
     'urlBackgroundSelectedId',
+    // applyImportedConfig only applies the card's mode for the three known values, all truthy
+    // strings, so an absent one is skipped there the same as here.
+    'stageTrackPillMode',
+    // applyImportedConfig only applies a known info strip preset, all of which are truthy strings.
+    'libraryWallSeamStyle',
 ]);
 
 // Per-renderer tunings the import skips whenever the visualizerTunings bundle is present. The three
@@ -159,6 +198,9 @@ const BUNDLED_TUNING_FIELDS = new Set([
     'dioramaTuning',
     'monetTuning',
     'pendoloTuning',
+    'sonnetTuning',
+    'temperaTuning',
+    'lumiereTuning',
 ]);
 
 // Structural compare over the plain JSON the codec emits — enough for tunings and font arrays, and
