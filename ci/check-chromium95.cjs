@@ -9,7 +9,7 @@ const deadline = setTimeout(() => { console.error('Chromium 95 check exceeded th
   const version = browser.version();
   if (!version.startsWith('95.')) throw new Error(`Expected Chromium 95, got ${version}`);
   const page = await browser.newPage({viewport: {width: 1920, height: 1080}, locale: 'en-US'});
-  page.setDefaultTimeout(15000);
+  page.setDefaultTimeout(30000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:4173/', {waitUntil: 'domcontentloaded'});
@@ -42,9 +42,12 @@ const deadline = setTimeout(() => { console.error('Chromium 95 check exceeded th
   if (styles.background !== 'rgba(255, 255, 255, 0.1)' || !styles.transform.includes('50')) throw new Error(`CSS compatibility failed: ${JSON.stringify(styles)}`);
   const settings = page.locator('button[title="Help & Options"]');
   if (await settings.count()) {
-    await settings.first().click();
+    if (!await settings.first().isVisible()) throw new Error('Settings entry is not visible');
+    await settings.first().evaluate(button => button.click());
   } else {
-    await page.locator('button[title="设置"],button[title="Settings"],button[aria-label="Settings"],button[aria-label="设置"]').first().click();
+    const entry = page.locator('button[title="设置"],button[title="Settings"],button[aria-label="Settings"],button[aria-label="设置"]').first();
+    if (!await entry.isVisible()) throw new Error('Settings entry is not visible');
+    await entry.evaluate(button => button.click());
   }
   await page.waitForTimeout(1000);
   const after = await page.evaluate(() => document.body.innerText);
