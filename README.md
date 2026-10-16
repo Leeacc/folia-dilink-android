@@ -167,3 +167,6 @@ APK SHA-256：`f19990a2b2ad81c5ffcb33b93e3f3b4fc0b291c8bdf0eec324b61fa17ab06d6d`
 应用请求透明状态栏、导航栏及分隔线，关闭系统自动对比色遮罩；分屏时不再主动恢复所有系统栏。保留原有窗口安全边距和车机拖动控件。**这些设置不等于能够移除车机 DecorView 绘制的分屏标题条**，实际黑条效果仍须车机复测。
 
 原厂音乐卡片仍未修复，用户照片证实它保留汽水图标/歌曲。增加只读的系统栏属性和最近 MediaBrowser 连接方诊断；没有连接记录并不能单独证明车机拒绝 MediaSession，因为控制器也可直接读取媒体会话。未改变 R8 的原生音轨、音频焦点、增益与按键逻辑。详见 [R10 核查](docs/dilink-r10-pane-upstream.md)。
+
+
+R10 交付：versionCode **43**，源码 `dfd84ba30971025c4cae911f6e64c902715e7f36`，[Actions38855809044](https://github.com/Leeacc/folia-dilink-android/actions/runs/38855809044) 构建、Chromium95及API29/35回归全部成功。五种窗口尺寸×四个设置标签的末尾控件可达；实际APK原生播放/音量/媒体按键与后台回归通过。标准系统栏属性为透明；DiLink专用标题条需实车复测，原厂卡片仍未修复。APK SHA-256：`435bf07be315fc08f559afb7e60cf83375ea6caeac394f12fa2123cc8375af6d`。
