@@ -11,3 +11,9 @@ Browser 插件不可用，本地使用已有 Playwright / Chromium 156。真实�
 新增 CarControllerEvidence 记录最近8个浏览客户端与最近8次远程会话指令（真实 Android controller 包名、动作和单调时钟），防止 lastBrowserClient 被 SystemUI 后续连接覆盖而遗漏厂商。诊断附 active、playbackState、hasMetadata 和 notificationEnabled。不读取账号/曲目内容，不申请更多权限、不冒用别的包、不写厂商受保护 Provider 或仪表 FID。CI 检查系统媒体控制后确实产生指令记录；普通模拟器不代表 BYD 卡片已接纳。
 
 下一步需要本车播放后、点击卡片控制后的 controllerEvidence 与 oem 版本信息；若厂商客户端没有浏览连接，也可能直接读 MediaSession，因此仍不能仅凭 browserClients 为空判定拒绝。远程指令未到达只能证明它没有发给 Folia，不能猜测私有 SDK 协议。
+
+## 旧内核构建的样式层级
+
+Chromium95 CI 发现音量滑条无法响应；本地 Chromium96 的实际编译包复现 padding 为0。PostCSS cascade-layers 原本逐 CSS 模块执行，Tailwind 的 reset 被添加优先级，而后加载的组件 CSS 没有同样的层级上下文。其官方文档明确要求输入完整样式包。现在 Android 单独使用 cssCodeSplit:false，并在 build/androidCssBundle.mjs 中对最终合并的唯一CSS资产执行一次层级转换；其余旧内核特性仍由原 PostCSS 处理。Desktop/Web 构建不变。完整样式包约620KiB，JS/可视化组件仍保持按需加载。
+
+修正后 Chromium96 回读菜单内边距16px（之前0px），五种尺寸的实际菜单、帮助和音量交互通过；Chromium156同样通过。CI继续使用真实Chromium95，不将96冒称95。菜单回归检查同时验证实际计算后的内边距，避免只看元素存在。交互测试等待实际开关/帮助状态完成，而非用固定延迟猜测旧浏览器的渲染完成时间。
