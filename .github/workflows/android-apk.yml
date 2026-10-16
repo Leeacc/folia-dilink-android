@@ -191,4 +191,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          grep '  folia-dilink.apk$' artifacts/SHA256SUMS.txt > artifacts/release-sha.txt
+          mv artifacts/release-sha.txt artifacts/SHA256SUMS.txt
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo 'Release already exists; keeping its published assets.'
+            exit 0
+          fi
           gh release create "$GITHUB_REF_NAME" artifacts/folia-dilink.apk artifacts/SHA256SUMS.txt artifacts/UPSTREAM.json artifacts/BUILD_COMMIT.txt artifacts/release-signature.txt --title "Folia DiLink $GITHUB_REF_NAME" --notes-file "docs/releases/$GITHUB_REF_NAME.md" --prerelease --verify-tag

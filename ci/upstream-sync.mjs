@@ -41,3 +41,6 @@ run('git',['add','UPSTREAM.json']);run('git',['commit','-m',`Prepare ${tag} upst
 run('git',['push','origin',branch]);
 writeFileSync('upstream-update.md',`Official upstream: ${latest.html_url}\n\nThis is a draft source merge. Resolve package/Android versions, inspect new native dependencies, preserve car playback, and run docs/MAINTENANCE.md before merging or releasing. No APK has been published.\n`);
 run('gh',['pr','create','--repo',repo,'--base','main','--head',branch,'--draft','--title',`Sync Folia ${tag} for DiLink`,'--body-file','upstream-update.md']);
+
+// GITHUB_TOKEN pushes do not themselves trigger another workflow; explicitly dispatch validation.
+run('gh',['workflow','run','android-apk.yml','--repo',repo,'--ref',branch]);
