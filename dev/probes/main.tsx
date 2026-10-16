@@ -1,9 +1,11 @@
+import { installCarLayoutCompat } from '../../src/platform/carLayoutCompat';
 import React from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import '../../src/index.css';
 import type { ProbeDefinition } from './definition';
 import { PROBES, PROBE_LIST } from './registry';
+installCarLayoutCompat();
 // dev/probes/main.tsx
 
 /**

@@ -100,6 +100,7 @@ export const useVisualizerPixiHost = <TRuntime, TSong>({
         if (!host) return undefined;
         let disposed = false;
         let createdRuntime: TRuntime | null = null;
+        host.dataset.pixiRuntime = 'loading';
         const abortController = new AbortController();
         signalRef.current = abortController.signal;
         onFailedRef.current?.(false);
@@ -112,6 +113,7 @@ export const useVisualizerPixiHost = <TRuntime, TSong>({
                     destroyRef.current(runtime);
                     return;
                 }
+                host.dataset.pixiRuntime = 'ready';
                 createdRuntime = runtime;
                 runtimeRef.current = runtime;
                 appliedSongRef.current = initialSong;
@@ -119,6 +121,7 @@ export const useVisualizerPixiHost = <TRuntime, TSong>({
             })
             .catch(error => {
                 if (isAbort(error)) return;
+                host.dataset.pixiRuntime = 'failed';
                 console.error(`[${label}] Pixi runtime initialization failed`, error);
                 if (!disposed) onFailedRef.current?.(true);
             });
@@ -130,6 +133,7 @@ export const useVisualizerPixiHost = <TRuntime, TSong>({
             const runtime = createdRuntime ?? runtimeRef.current;
             if (runtime) destroyRef.current(runtime);
             runtimeRef.current = null;
+            delete host.dataset.pixiRuntime;
             host.replaceChildren();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -134,7 +134,8 @@ const readStoredVolume = () => {
 
     let saved = localStorage.getItem('player_volume');
     if (isCapacitorAndroid() && localStorage.getItem('car_native_gain_v1') !== 'true') {
-        saved = String(Math.min(0.2, Math.max(0, Number(saved ?? 0.2)) || 0.2));
+        const previous = Number(saved ?? 0.2);
+        saved = String(Number.isFinite(previous) ? Math.min(0.2, Math.max(0, previous)) : 0.2);
         localStorage.setItem('player_volume', saved);
         localStorage.setItem('car_native_gain_v1', 'true');
     }

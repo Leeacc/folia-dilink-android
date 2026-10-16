@@ -1,3 +1,4 @@
+import { hasEmbeddedMusic, requestEmbeddedMusic } from '../../../services/embeddedMusic';
 // src/utils/lyrics/providers/qqLyricProvider.ts
 
 /**
@@ -42,6 +43,12 @@ async function requestQQ(method: string, module: string, param: any): Promise<an
   const targetUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
   const url = isElectron ? targetUrl : `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 
+  if (hasEmbeddedMusic()) {
+    const result = await requestEmbeddedMusic('qq', '/getFoliaRpc', {method: 'POST', body: JSON.stringify(payload)});
+    const data = result.body;
+    if (result.status !== 200 || data?.code !== 0 || data.request?.code !== 0) throw new Error('Embedded QQ lyric/search request failed');
+    return data.request.data;
+  }
   const response = await fetch(url, {
     method: 'POST',
     credentials: isElectron ? 'omit' : 'same-origin',

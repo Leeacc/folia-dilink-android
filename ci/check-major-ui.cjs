@@ -29,12 +29,35 @@ const deadline = setTimeout(() => process.exit(1), 600000);
         if(errors.length)throw new Error(errors.join(';'));
         await require('./check-visualizer-settings.cjs')(page);
         await page.close();
+        page=await browser.newPage({viewport:{width:1280,height:720},hasTouch:true});
+        await page.goto(`${base}/dev-probe.html?probe=bravaisKinds`,{waitUntil:'domcontentloaded'});
+        await page.waitForFunction(()=>window.__bravaisKindsProbe?.ready(),{timeout:60000});
+        await page.waitForTimeout(1000);
+        const before=await page.locator('[data-bravais-half="left"]').evaluate(e=>getComputedStyle(e).transform);
+        const touch=await page.context().newCDPSession(page);
+        await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:0,x:350,y:360}]});
+        for(let step=1;step<=8;step++){
+            await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{id:0,x:350-step*20,y:360}]});
+            await page.waitForTimeout(30);
+        }
+        await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        await page.waitForTimeout(500);
+        const after=await page.locator('[data-bravais-half="left"]').evaluate(e=>getComputedStyle(e).transform);
+        report.bravais={tiles:await page.locator('[data-library-card]').count(),touchPan:before!==after};
+        if(!report.bravais.tiles || !report.bravais.touchPan)throw new Error('Bravais touch navigation failed');
+        await page.screenshot({path:out+'/bravais-tiles.png'});
+        await page.setViewportSize({width:800,height:600});await page.waitForTimeout(500);
+        await page.screenshot({path:out+'/bravais-split.png'});
+        await page.close();
         for (const mode of modes) {
             page=await browser.newPage({viewport:{width:1280,height:720}});
             const errors=[];page.on('pageerror',e=>errors.push(e.message));
             await page.goto(`${base}/dev-probe.html?probe=visualizerMemory&vis=${mode}&lines=24&speed=2&start=3`,{waitUntil:'domcontentloaded'});
             await page.waitForSelector(`[data-probe-mode="${mode}"]`,{timeout:60000});
-            await page.waitForTimeout(2500);
+            if (['lumiere','sonnet','tempera'].includes(mode)) {
+                await page.waitForSelector('[data-pixi-runtime="ready"] canvas', {timeout:120000});
+                await page.waitForTimeout(1200);
+            } else await page.waitForTimeout(2500);
             const sample=await page.evaluate(()=>({children:document.querySelector('[data-probe-mode]')?.children.length,canvases:document.querySelectorAll('canvas').length}));
             await page.screenshot({path:`${out}/${mode}.png`});
             report.modes.push({mode,...sample,errors});

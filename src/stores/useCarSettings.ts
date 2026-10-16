@@ -15,7 +15,7 @@ export const DEFAULT_CAR_PREFERENCES: CarPreferences = {
     horizontalFingers: 1,
     verticalFingers: 2,
     balancedGraphics: true,
-            spectrumEnabled: false,
+    spectrumEnabled: false,
 };
 export const useCarSettings = create<
     CarPreferences & { setPreference: <K extends keyof CarPreferences>(key: K, value: CarPreferences[K]) => void }

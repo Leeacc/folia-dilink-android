@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const http = require('node:http');
+const { requestQqRpc } = require('./qqRpc.cjs');
 const { searchQq } = require('./qqSearch.cjs');
 
 // Embed the desktop QQ API behind Folia's authenticated loopback bridge, without a second listener.
@@ -55,8 +56,13 @@ function requestQq(endpoint, stateDir, port, token, method = 'GET', payload = ''
         '/getSingerHotsong',
         '/getSearchByKey',
         '/getLyric',
+        '/getFoliaRpc',
     ]);
     if (!allowed.has(route)) throw new Error('Unsupported QQ route');
+    if (parsed.pathname === '/getFoliaRpc') {
+        if (method !== 'POST') throw new Error('Lyric RPC requires POST');
+        return requestQqRpc(payload);
+    }
     if (parsed.pathname === '/getSearchByKey') return searchQq(parsed.searchParams);
     return new Promise((resolve, reject) => {
         const request = http.request(
