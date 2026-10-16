@@ -18,6 +18,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(EmbeddedMusicPlugin.class);
         registerPlugin(CarMediaPlugin.class);
         registerPlugin(NativeAudioPlugin.class);
+        registerPlugin(CarSpectrumPlugin.class);
         super.onCreate(savedInstanceState);
         setVolumeControlStream(android.media.AudioManager.STREAM_MUSIC);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);

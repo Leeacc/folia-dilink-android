@@ -6,6 +6,8 @@ import { detectTimedLyricFormat } from './lyrics/formatDetection';
 import { getLineRenderHints } from './lyrics/renderHints';
 import { isLocalPlaybackSong, isNavidromePlaybackSong, isStagePlaybackSong } from './appPlaybackGuards';
 
+export { hasRenderableLyrics } from './lyrics/validity';
+
 // Pure helpers for playback state, debug snapshots, and lyric timing.
 export const clampMediaVolume = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -38,16 +40,6 @@ export const formatTime = (time: number) => {
 };
 
 export const getReplayGainModeLabel = (mode: ReplayGainMode): string => i18n.t(`replayGain.${mode}`);
-
-export const hasRenderableLyrics = (lyricData: LyricData | null | undefined): lyricData is LyricData => {
-    if (!lyricData?.lines?.length) {
-        return false;
-    }
-
-    return lyricData.lines.some(line =>
-        line.fullText.trim().length > 0 || (line.translation?.trim().length ?? 0) > 0
-    );
-};
 
 export const getAudioSrcKind = (audioSrc: string | null): 'empty' | 'blob' | 'http' | 'other' => {
     if (!audioSrc) {
@@ -93,6 +85,42 @@ export const toSafeRemoteUrl = (url: string | null | undefined): string | null |
     }
 
     return normalizedUrl;
+};
+
+// Keeps KuGou's original HTTP media URL only in Electron; Web/PWA retains HTTPS normalization.
+export const toSafePlaybackUrl = (
+    url: string | null | undefined,
+    isElectron = typeof window !== 'undefined' && Boolean(window.electron)
+): string | null | undefined => {
+    if (!url || !isElectron) {
+        return toSafeRemoteUrl(url);
+    }
+
+    const normalizedUrl = url.split(/,\s*(?=https?:\/\/)/i)[0]?.trim() || url;
+    try {
+        const parsedUrl = new URL(normalizedUrl);
+        if (
+            parsedUrl.protocol === 'http:' &&
+            parsedUrl.hostname.startsWith('fs.') &&
+            parsedUrl.hostname.endsWith('.kugou.com')
+        ) {
+            return normalizedUrl;
+        }
+    } catch {
+        return normalizedUrl;
+    }
+
+    return toSafeRemoteUrl(normalizedUrl);
+};
+
+// toSafePlaybackUrl only normalizes (http→https, drops trailing fallback URLs) and never filters the scheme;
+// script schemes and blank strings are not audio sources. Shared by the loader and the prefetch resolver.
+const NON_MEDIA_URL_SCHEME = /^\s*(javascript|vbscript):/i;
+
+export const toPlayableAudioUrl = (rawUrl: string | null | undefined): string | null => {
+    const url = toSafePlaybackUrl(rawUrl);
+    if (!url || !url.trim() || NON_MEDIA_URL_SCHEME.test(url)) return null;
+    return url;
 };
 
 export const resolveDebugSongSource = (song: SongResult | null): 'none' | 'local' | 'navidrome' | 'online' => {

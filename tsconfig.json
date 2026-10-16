@@ -27,10 +27,11 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "exclude": [
+  "exclude": ["test-results",
     "node_modules",
     "dist",
     "release",
-    "sync-server"
+    "sync-server",
+    "original"
   ]
 }

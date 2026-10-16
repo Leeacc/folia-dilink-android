@@ -28,8 +28,8 @@ android {
         applicationId "io.github.leeacc.folia.dilink"
         minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode Integer.parseInt(System.getenv('FOLIA_ANDROID_VERSION_CODE') ?: '1')
-        versionName "${packageJson.version}-dilink-r10-pane"
+        versionCode 72001
+        versionName "${packageJson.version}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -41,6 +41,7 @@ android {
         if (hasReleaseKeystore) {
             release {
                 storeFile file(keystoreProperties['storeFile'])
+                storeType 'PKCS12'
                 storePassword keystoreProperties['storePassword']
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
@@ -48,6 +49,7 @@ android {
         }
     }
     buildTypes {
+        debug { if (hasReleaseKeystore) signingConfig signingConfigs.release }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'

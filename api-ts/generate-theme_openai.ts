@@ -1,3 +1,7 @@
+import {
+    detectOpenAICompatibleProvider,
+    sendOpenAICompatibleRequest,
+} from '../shared/openAICompatibleRequest.mjs';
 import { sanitizeDualTheme } from "../shared/themeSanitizer.mjs";
 
 // 当前文件：Vercel OpenAI 兼容主题生成函数的 TypeScript 源文件。
@@ -6,32 +10,11 @@ export const config = {
 };
 
 const DEFAULT_OPENAI_CHAT_COMPLETIONS_URL = 'https://api.openai.com/v1/chat/completions';
-const DEFAULT_OPENAI_MODEL = 'gpt-4o';
+const DEFAULT_OPENAI_MODEL = 'gpt-5.6-luna';
 const DEFAULT_OPENAI_TEMPERATURE = 0.7;
 const DEEPSEEK_DEFAULT_MODEL = 'deepseek-v4-flash';
 const THEME_JSON_SCHEMA_NAME = 'dual_theme';
-const CAPACITOR_ANDROID_ORIGIN = 'https://localhost';
-
-const buildCorsHeaders = (req: Request): Record<string, string> => (
-    req.headers.get('origin') === CAPACITOR_ANDROID_ORIGIN
-        ? {
-            'Access-Control-Allow-Origin': CAPACITOR_ANDROID_ORIGIN,
-            'Access-Control-Allow-Methods': 'POST,OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-            'Vary': 'Origin',
-        }
-        : {}
-);
-
-const jsonResponse = (req: Request, body: unknown, status: number): Response => (
-    new Response(JSON.stringify(body), {
-        status,
-        headers: {
-            'Content-Type': 'application/json',
-            ...buildCorsHeaders(req),
-        },
-    })
-);
+const THEME_MAX_OUTPUT_TOKENS = 4096;
 
 const THEME_JSON_SCHEMA = {
     type: 'object',
@@ -67,7 +50,7 @@ const THEME_JSON_SCHEMA = {
                     items: { type: 'string' }
                 }
             },
-            required: ['name', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
+            required: ['name', 'description', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
         },
         dark: {
             type: 'object',
@@ -99,7 +82,7 @@ const THEME_JSON_SCHEMA = {
                     items: { type: 'string' }
                 }
             },
-            required: ['name', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
+            required: ['name', 'description', 'backgroundColor', 'primaryColor', 'accentColor', 'secondaryColor', 'wordColors', 'lyricsIcons']
         }
     },
     required: ['light', 'dark']
@@ -150,31 +133,6 @@ const resolveOpenAICompatibleModel = (apiUrl: string, configuredModel?: string) 
     }
 
     return DEFAULT_OPENAI_MODEL;
-};
-
-const detectOpenAICompatibleProvider = (apiUrl: string, model: string): OpenAICompatibleProvider => {
-    const normalizedModel = model.trim().toLowerCase();
-    if (normalizedModel.startsWith('deepseek-')) {
-        return 'deepseek';
-    }
-
-    try {
-        const hostname = new URL(apiUrl).hostname.toLowerCase();
-        if (hostname === 'api.deepseek.com' || hostname.endsWith('.deepseek.com')) {
-            return 'deepseek';
-        }
-        if (hostname === 'api.openai.com' || hostname.endsWith('.openai.com')) {
-            return 'openai';
-        }
-    } catch {
-        // Fall through to generic provider handling.
-    }
-
-    if (/^(gpt|o[1-9]|o[1-9]-|chatgpt-)/.test(normalizedModel)) {
-        return 'openai';
-    }
-
-    return 'generic';
 };
 
 const providerSupportsStructuredOutputs = (provider: OpenAICompatibleProvider) => provider === 'openai';
@@ -298,6 +256,7 @@ const buildOpenAICompatibleRequestBody = (
             model,
             messages,
             temperature,
+            max_completion_tokens: THEME_MAX_OUTPUT_TOKENS,
             response_format: {
                 type: 'json_schema',
                 json_schema: {
@@ -313,6 +272,7 @@ const buildOpenAICompatibleRequestBody = (
         model,
         messages,
         temperature,
+        max_tokens: 8192,
         response_format: { type: 'json_object' }
     };
 };
@@ -343,22 +303,21 @@ const extractResponseContentText = (message: { content?: unknown; refusal?: unkn
 };
 
 export default async function handler(req: Request) {
-    if (req.method === 'OPTIONS') {
-        return new Response(null, {
-            status: 204,
-            headers: buildCorsHeaders(req),
-        });
-    }
-
     if (req.method !== 'POST') {
-        return jsonResponse(req, { error: 'Method Not Allowed' }, 405);
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
         const { lyricsText, isPureMusic = false, songTitle } = await req.json();
 
         if (!lyricsText) {
-            return jsonResponse(req, { error: 'Missing lyricsText' }, 400);
+            return new Response(JSON.stringify({ error: 'Missing lyricsText' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         const apiKey = process.env.OPENAI_API_KEY;
@@ -368,11 +327,14 @@ export default async function handler(req: Request) {
         const temperature = Number.isFinite(configuredTemperature) && configuredTemperature >= 0 && configuredTemperature <= 2
             ? configuredTemperature
             : DEFAULT_OPENAI_TEMPERATURE;
-        const provider = detectOpenAICompatibleProvider(apiUrl, model);
+        const provider = detectOpenAICompatibleProvider(apiUrl) as OpenAICompatibleProvider;
 
         if (!apiKey) {
             console.error("OpenAI API Key is missing in server environment.");
-            return jsonResponse(req, { error: 'Server configuration error' }, 500);
+            return new Response(JSON.stringify({ error: 'Server configuration error' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         // Limit text to avoid token limits if lyrics are huge
@@ -380,13 +342,18 @@ export default async function handler(req: Request) {
         const systemPrompt = buildThemeSystemPrompt(true);
         const sourcePrompt = buildThemeSourcePrompt(snippet, isPureMusic, songTitle);
 
-        const response = await fetch(apiUrl, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${apiKey}`,
+        const response = await sendOpenAICompatibleRequest({
+            apiUrl,
+            provider,
+            body: buildOpenAICompatibleRequestBody(model, provider, systemPrompt, sourcePrompt, temperature),
+            init: {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+                signal: AbortSignal.timeout(120_000),
             },
-            body: JSON.stringify(buildOpenAICompatibleRequestBody(model, provider, systemPrompt, sourcePrompt, temperature)),
         });
 
         if (!response.ok) {
@@ -424,11 +391,17 @@ export default async function handler(req: Request) {
         dualTheme.dark.fontStyle = 'sans';
         dualTheme.dark.provider = 'OpenAI Compatible';
 
-        return jsonResponse(req, dualTheme, 200);
+        return new Response(JSON.stringify(dualTheme), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
 
     } catch (error) {
         console.error("Error generating theme:", error);
         const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
-        return jsonResponse(req, { error: errorMessage }, 500);
+        return new Response(JSON.stringify({ error: errorMessage }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 }

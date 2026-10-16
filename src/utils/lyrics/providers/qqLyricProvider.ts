@@ -11,7 +11,7 @@ import { detectTimedLyricFormat } from '../formatDetection';
 import { qrcDecrypt } from './qrcDecrypt';
 import { applyDetectedChorusEffects, applyNeteaseChorusByTime } from '../chorusEffects';
 import type { NeteaseChorusRange } from '../chorusEffects';
-import { resolveFoliaApiUrl } from '../../../services/webApi';
+import { getOriginalCoverUrl } from '../../coverUrl';
 
 const isElectron = typeof window !== 'undefined' && (window as any).electron;
 
@@ -40,7 +40,7 @@ async function requestQQ(method: string, module: string, param: any): Promise<an
   };
 
   const targetUrl = 'https://u.y.qq.com/cgi-bin/musicu.fcg';
-  const url = isElectron ? targetUrl : resolveFoliaApiUrl(`lyric-proxy?url=${encodeURIComponent(targetUrl)}`);
+  const url = isElectron ? targetUrl : `/api/lyric-proxy?url=${encodeURIComponent(targetUrl)}`;
 
   const response = await fetch(url, {
     method: 'POST',
@@ -124,7 +124,7 @@ export async function searchQQLyrics(keyword: string, page = 1, pageSize = 20): 
       
       const albumMid = info.album?.mid;
       const picUrl = albumMid
-        ? `https://y.gtimg.cn/music/photo_new/T002R300x300M000${albumMid}.jpg?max_age=2592000`
+        ? getOriginalCoverUrl(`https://y.gtimg.cn/music/photo_new/T002R300x300M000${albumMid}.jpg?max_age=2592000`)
         : undefined;
 
       return {

@@ -22,7 +22,9 @@ public class EmbeddedMusicPlugin extends Plugin {
         }
         requests.execute(() -> {
             try {
-                JSONObject input = new JSONObject().put("provider", provider).put("endpoint", endpoint);
+                JSONObject input = new JSONObject().put("provider", provider).put("endpoint", endpoint)
+                    .put("method", call.getString("method", "GET"))
+                    .put("payload", call.getString("payload", ""));
                 call.resolve(new JSObject(EmbeddedMusic.request(input).toString()));
             } catch (Exception e) { call.reject("内置音乐服务暂时无法连接，请检查网络后重试"); }
         });

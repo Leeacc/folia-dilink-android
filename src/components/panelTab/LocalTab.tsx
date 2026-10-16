@@ -1,14 +1,18 @@
-import React, { useEffect, useRef, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { UnifiedSong, ReplayGainMode } from '../../types';
-import { FileAudio, RefreshCw, FileText, Upload } from 'lucide-react';
+import { FileAudio, RefreshCw, FileText, TriangleAlert } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LyricTimelineOffsetControl from './LyricTimelineOffsetControl';
+import LyricFileButton from './LyricFileButton';
 import { getLyricProviderLabel } from '../../utils/lyrics/lyricSourceLabels';
+import { detectLyricFileIssues } from '../../utils/lyrics/lyricFileIssues';
 import { getLocalSongs } from '../../services/db';
 import type { LocalSong } from '../../types';
 import { isLocalPlaybackSong } from '../../utils/appPlaybackGuards';
 import ReplayGainControl from './ReplayGainControl';
+import { usePlaybackStore } from '../../stores/usePlaybackStore';
+import { readLyricFile } from '../../utils/lyrics/lyricFileDecoding';
 
 interface LocalTabProps {
     currentSong: UnifiedSong;
@@ -42,7 +46,7 @@ const LocalTab: React.FC<LocalTabProps> = ({
     isDaylight
 }) => {
     const { t } = useTranslation();
-    const lrcInputRef = useRef<HTMLInputElement>(null);
+    const activeSource = usePlaybackStore(state => state.activeLocalLyricsSource);
 
     const [loadedLocalData, setLoadedLocalData] = useState<{
         songId: string;
@@ -69,20 +73,21 @@ const LocalTab: React.FC<LocalTabProps> = ({
             }
         });
         return () => { active = false; };
-    }, [localSongId]);
+    // Source changes keep the same local song id, but the controller refreshes the current-song
+    // snapshot after persisting them. Re-read the record so this panel does not keep stale source UI.
+    }, [localSongId, currentSong]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, isTranslation: boolean) => {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            const content = event.target?.result as string;
+        void readLyricFile(file).then((content) => {
             if (content) {
                 onUpdateLocalLyrics(content, isTranslation, file.name);
             }
-        };
-        reader.readAsText(file);
+        }).catch((error) => {
+            console.error(`[LocalTab] Failed to read lyric file ${file.name}`, error);
+        });
 
         // Reset input
         e.target.value = '';
@@ -100,20 +105,12 @@ const LocalTab: React.FC<LocalTabProps> = ({
         }
         if ((localData.matchedLyrics?.lines?.length ?? 0) > 0) {
             sources.push({ key: 'online', label: getLyricProviderLabel(localData.matchedLyricsSource, localData.matchedLyricsProviderPlatform) });
+        } else if (localData.markedPureMusic) {
+            // 标记为纯音乐的歌占 online 这一位：选它就是不显示歌词，有本地 / 内嵌歌词时也能切回来。
+            sources.push({ key: 'online', label: t('localMusic.statusPureMusic') });
         }
         return sources;
     }, [localData, t]);
-
-    // Determine currently active source
-    const activeSource = useMemo(() => {
-        if (!localData) return null;
-        if (localData.lyricsSource) return localData.lyricsSource;
-        // Default priority: local > embedded > online
-        if (localData.hasLocalLyrics) return 'local';
-        if (localData.hasEmbeddedLyrics) return 'embedded';
-        if ((localData.matchedLyrics?.lines?.length ?? 0) > 0) return 'online';
-        return null;
-    }, [localData]);
 
     const tabActiveBg = isDaylight ? 'bg-blue-500/15 text-blue-600' : 'bg-blue-500/20 text-blue-300';
     const tabInactiveBg = isDaylight ? 'bg-black/5 text-zinc-500 hover:bg-black/10' : 'bg-white/5 text-zinc-400 hover:bg-white/10';
@@ -124,9 +121,15 @@ const LocalTab: React.FC<LocalTabProps> = ({
         if (localData.hasEmbeddedLyrics) states.push(t('localMusic.statusEmbedded'));
         if ((localData.matchedLyrics?.lines?.length ?? 0) > 0) {
             states.push(getLyricProviderLabel(localData.matchedLyricsSource, localData.matchedLyricsProviderPlatform));
+        } else if (localData.markedPureMusic) {
+            states.push(t('localMusic.statusPureMusic'));
         }
         return states.length > 0 ? states.join(' / ') : t('localMusic.statusNone');
     }, [localData, t]);
+    const localLyricFileIssues = useMemo(
+        () => detectLyricFileIssues(localData?.localLyricsContent, localData?.localLyricsFormat),
+        [localData?.localLyricsContent, localData?.localLyricsFormat]
+    );
     if (!isLocalSong) {
         return <div className="min-h-96" aria-hidden="true" />;
     }
@@ -193,19 +196,10 @@ const LocalTab: React.FC<LocalTabProps> = ({
                         <FileText size={14} /> {t('localMusic.lyrics')}
                     </h3>
                     <div className="flex items-center gap-1.5">
-                        <button
-                            onClick={() => lrcInputRef.current?.click()}
-                            className="p-1.5 hover:bg-white/10 rounded-md transition-colors"
-                            title={t('localMusic.selectLrcFile')}
-                        >
-                            <Upload size={14} />
-                        </button>
-                        <input
-                            type="file"
-                            accept=".lrc,.vtt,.ttml,.qrc,.yrc,.krc,.txt"
-                            ref={lrcInputRef}
-                            className="hidden"
-                            onChange={(e) => handleFileChange(e, false)}
+                        <LyricFileButton
+                            isDaylight={isDaylight}
+                            onImportChange={(e) => handleFileChange(e, false)}
+                            buttonClassName="p-1.5 hover:bg-white/10 rounded-md transition-colors"
                         />
                         <button
                             onClick={onMatchOnline}
@@ -239,6 +233,22 @@ const LocalTab: React.FC<LocalTabProps> = ({
                                 {source.label}
                             </button>
                         ))}
+                    </div>
+                )}
+
+                {activeSource === 'local' && localLyricFileIssues.includes('translation-shifted-to-end-time') && (
+                    <div
+                        role="alert"
+                        className={`space-y-1.5 rounded-lg px-3 py-2.5 text-xs leading-relaxed ${
+                            isDaylight ? 'bg-amber-500/15 text-amber-800' : 'bg-amber-400/10 text-amber-200'
+                        }`}
+                    >
+                        <div className="flex items-center gap-1.5 font-semibold">
+                            <TriangleAlert size={13} className="shrink-0" />
+                            {t('localMusic.lyricFileIssueShiftedTitle')}
+                        </div>
+                        <p className="opacity-90">{t('localMusic.lyricFileIssueShiftedBody')}</p>
+                        <p className="opacity-90">{t('localMusic.lyricFileIssueShiftedFix')}</p>
                     </div>
                 )}
 

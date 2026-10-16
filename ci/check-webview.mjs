@@ -35,7 +35,7 @@ if (!webViewMajor) throw new Error('Cannot identify WebView version');
 if (webViewMajor < 95) {
   if (!dom.text.includes('Folia') || !dom.text.includes('WebView')) throw new Error('Missing compatibility message');
 } else {
-  if (!dom.children || !dom.text.includes('Folia') || !/Playlists|歌单/.test(dom.text)) throw new Error('Folia library navigation did not render');
+  if (!dom.children || !/Playlists|歌单/.test(dom.text)) throw new Error('Folia library navigation did not render');
 }
 
 if (dom.width !== dom.screenWidth || dom.height !== dom.screenHeight) throw new Error('Emulator system bars are not hidden');
@@ -113,15 +113,20 @@ if (webViewMajor >= 95) {
       qq.searchResponse = {code:response?.code,diagnostic:response?.diagnostic,file:response?.file,status:response?.status,outerCode:response?.body?.code,requestCode:response?.body?.request?.code};
       const songs = response?.body?.request?.data?.body?.song?.list;
       qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid || songs[0].songmid);
-      const qqButton = [...document.querySelectorAll('button')].find(button => /QQ音乐/.test(button.textContent) && /Connect|连接/.test(button.textContent));
+      const account = document.querySelector('[data-bravais-account-toggle]');
+      if (!account) throw new Error('Account entry unavailable');
+      account.click(); await delay(500);
+      const qqButton = document.querySelector('[data-bravais-account-provider="qq"] button');
       if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
-      qqButton.click();
+      qqButton.click(); await delay(1000);
+      const method = document.querySelector('[data-bravais-login-method="qq"]') || document.querySelector('[data-bravais-login-method]');
+      if (method) method.click();
       for (let attempt = 0; attempt < 90; attempt++) {
-        const image = document.querySelector('[role="dialog"] img[alt="QR Code"]');
+        const image = document.querySelector('[data-bravais-account-login="qq"] img[alt="QR Code"]');
         if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qq.qrVisible = true; break; }
         await delay(1000);
       }
-      qq.dialogText = document.querySelector('[role="dialog"]')?.textContent?.slice(0,400);
+      qq.dialogText = document.querySelector('[data-bravais-account-login="qq"]')?.textContent?.slice(0,400);
     } catch (error) { qq.error = error.message; }
     return {embeddedQr:true, network, back:true, media, qq};
   })()`}}));

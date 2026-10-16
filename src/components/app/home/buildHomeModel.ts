@@ -1,128 +1,104 @@
-import type React from 'react';
-import { PlayerState, type SongResult } from '../../../types';
+import type { SongResult, StageSource } from '../../../types';
 import type { GridViewCollectionDescriptor } from './gridViewCollectionAdapters';
 import type { HomeSurfaceProps } from './homeSurfaceTypes';
 import { resolveSearchSource, type SearchSource } from '../../../stores/useSearchNavigationStore';
-import type { OnlineProviderPlatformState } from '../../../hooks/useOnlineProviderPlatform';
+import type { ProviderAccountSummary } from '../../../types/onlineMusic';
+import type { LibraryAccountController } from '../../../library/core/contracts/account';
+import { openSettings } from '../../../stores/useSettingsModalStore';
 
 // src/components/app/home/buildHomeModel.ts
 
 export type HomeViewModel = {
     surfaceProps: HomeSurfaceProps;
-    onlineProviderPlatform?: OnlineProviderPlatformState;
+    /** 在线账户 controller（App 持有，见 library/app/useLibraryAccountController），首页外壳交给首页 surface。 */
+    account: LibraryAccountController;
     onOpenCollection: (collection: GridViewCollectionDescriptor) => void;
     onPushCollection: (collection: GridViewCollectionDescriptor) => void;
+    /** 跳到集合栈的第 depth 层（保留的层数，0 为整个关掉），浏览器历史同步退回；见 useAppNavigation 的 popCollectionTo。 */
+    onPopCollectionTo: (depth: number) => void;
     onBackCollection: () => void;
 };
 
-type BuildHomeModelParams = {
-    onlineProviderPlatform?: OnlineProviderPlatformState;
+// What this file can read for itself, so the caller never names it. See useHomeModel below.
+type HomeModelAmbient = {
+    currentSong: HomeSurfaceProps['currentTrack'];
+    activePlaybackContext: 'main' | 'stage';
+    navidromeEnabled: HomeSurfaceProps['navidromeEnabled'];
+};
+
+export type HomeModelDeps = {
+    account: LibraryAccountController;
+    /** controller 快照里的当前平台摘要（未变时身份稳定）；首页的账户与在线歌单优先取它。 */
+    activeProvider?: ProviderAccountSummary;
     playSong: HomeSurfaceProps['onPlaySong'];
     navigateToPlayer: HomeSurfaceProps['onBackToPlayer'];
+    navigateToLattice: NonNullable<HomeSurfaceProps['onOpenLattice']>;
+    /** fb3：暂停 / 继续（应用的 togglePlay；useHomeModel 给它稳定身份）。 */
+    togglePlayback: NonNullable<HomeSurfaceProps['onTogglePlayback']>;
+    /** fb3：按「播放后进入的视图」进入播放视图（播放胶囊的同一个导航）。 */
+    enterPlaybackView: NonNullable<HomeSurfaceProps['onEnterPlaybackView']>;
     refreshOnlineProviderPlaylists: () => Promise<unknown>;
     user: HomeSurfaceProps['user'];
     playlists: HomeSurfaceProps['playlists'];
     cloudPlaylist?: HomeSurfaceProps['cloudPlaylist'];
-    currentSong: HomeSurfaceProps['currentTrack'];
-    playerState: PlayerState;
-    handlePlaylistSelect: HomeSurfaceProps['onSelectPlaylist'];
-    handleAlbumSelect: HomeSurfaceProps['onSelectAlbum'];
-    handleArtistSelect: HomeSurfaceProps['onSelectArtist'];
     focusedPlaylistIndex?: HomeSurfaceProps['focusedPlaylistIndex'];
     setFocusedPlaylistIndex?: HomeSurfaceProps['setFocusedPlaylistIndex'];
-    focusedFavoriteAlbumIndex?: HomeSurfaceProps['focusedFavoriteAlbumIndex'];
-    setFocusedFavoriteAlbumIndex?: HomeSurfaceProps['setFocusedFavoriteAlbumIndex'];
-    focusedRadioIndex?: HomeSurfaceProps['focusedRadioIndex'];
-    setFocusedRadioIndex?: HomeSurfaceProps['setFocusedRadioIndex'];
-    openSettings: NonNullable<HomeSurfaceProps['onOpenSettings']>;
     navigateToSearch: (args: { query: string; sourceTab: SearchSource; replace?: boolean }) => void;
-    openLocalAlbumByName?: HomeSurfaceProps['onSelectLocalAlbum'];
-    openLocalArtistByName?: HomeSurfaceProps['onSelectLocalArtist'];
     localSongs: HomeSurfaceProps['localSongs'];
     localLibraryCatalog: HomeSurfaceProps['localLibraryCatalog'];
     localPlaylists: HomeSurfaceProps['localPlaylists'];
     onRefreshLocalSongs: HomeSurfaceProps['onRefreshLocalSongs'];
-    onPlayLocalSong: HomeSurfaceProps['onPlayLocalSong'];
     onAddLocalSongToQueue?: HomeSurfaceProps['onAddLocalSongToQueue'];
     localMusicState: HomeSurfaceProps['localMusicState'];
     setLocalMusicState: HomeSurfaceProps['setLocalMusicState'];
-    onMatchSong?: HomeSurfaceProps['onMatchSong'];
-    onPlayNavidromeSong?: HomeSurfaceProps['onPlayNavidromeSong'];
     onAddNavidromeSongsToQueue?: HomeSurfaceProps['onAddNavidromeSongsToQueue'];
-    onMatchNavidromeSong?: HomeSurfaceProps['onMatchNavidromeSong'];
     navidromeFocusedAlbumIndex?: HomeSurfaceProps['navidromeFocusedAlbumIndex'];
     setNavidromeFocusedAlbumIndex?: HomeSurfaceProps['setNavidromeFocusedAlbumIndex'];
-    pendingNavidromeSelection?: HomeSurfaceProps['pendingNavidromeSelection'];
-    setPendingNavidromeSelection: React.Dispatch<React.SetStateAction<any>>;
-    stageSource?: HomeSurfaceProps['stageSource'];
-    activePlaybackContext: 'main' | 'stage';
+    stageSource?: StageSource | null;
     openStagePlayer: () => Promise<void>;
-    stageStatus?: HomeSurfaceProps['stageStatus'];
-    setStageStatus: React.Dispatch<React.SetStateAction<any>>;
-    leaveStagePlayback: () => void;
-    clearStagePlaybackSession: () => void;
-    clearPersistedStagePlaybackCache: () => Promise<void>;
-    loadStageSessionIntoPlayback: (session: any) => Promise<void>;
     theme: HomeSurfaceProps['theme'];
-    navidromeEnabled: HomeSurfaceProps['navidromeEnabled'];
     playAll: (songs: SongResult[]) => void;
-    addAllToQueue: (songs: SongResult[]) => void;
+    addAllToQueue: (songs: SongResult[], options?: { suppressToast?: boolean }) => number | void;
     addSongToQueue: (song: SongResult) => void;
     onStatusMessage?: HomeSurfaceProps['onStatusMessage'];
     onOpenCollection: (collection: GridViewCollectionDescriptor) => void;
     onPushCollection: (collection: GridViewCollectionDescriptor) => void;
+    onPopCollectionTo: (depth: number) => void;
     onBackCollection: () => void;
 };
 
+type BuildHomeModelParams = HomeModelAmbient & HomeModelDeps;
+
 // Builds the full Home model from raw app dependencies so App.tsx no longer assembles nested props inline.
 export const buildHomeModel = ({
-    onlineProviderPlatform,
+    account,
+    activeProvider,
     playSong,
     navigateToPlayer,
+    navigateToLattice,
+    togglePlayback,
+    enterPlaybackView,
     refreshOnlineProviderPlaylists,
     user,
     playlists,
     cloudPlaylist,
     currentSong,
-    playerState,
-    handlePlaylistSelect,
-    handleAlbumSelect,
-    handleArtistSelect,
     focusedPlaylistIndex,
     setFocusedPlaylistIndex,
-    focusedFavoriteAlbumIndex,
-    setFocusedFavoriteAlbumIndex,
-    focusedRadioIndex,
-    setFocusedRadioIndex,
-    openSettings,
     navigateToSearch,
-    openLocalAlbumByName,
-    openLocalArtistByName,
     localSongs,
     localLibraryCatalog,
     localPlaylists,
     onRefreshLocalSongs,
-    onPlayLocalSong,
     onAddLocalSongToQueue,
     localMusicState,
     setLocalMusicState,
-    onMatchSong,
-    onPlayNavidromeSong,
     onAddNavidromeSongsToQueue,
-    onMatchNavidromeSong,
     navidromeFocusedAlbumIndex,
     setNavidromeFocusedAlbumIndex,
-    pendingNavidromeSelection,
-    setPendingNavidromeSelection,
     stageSource,
     activePlaybackContext,
     openStagePlayer,
-    stageStatus,
-    setStageStatus,
-    leaveStagePlayback,
-    clearStagePlaybackSession,
-    clearPersistedStagePlaybackCache,
-    loadStageSessionIntoPlayback,
     theme,
     navidromeEnabled,
     playAll,
@@ -131,101 +107,51 @@ export const buildHomeModel = ({
     onStatusMessage,
     onOpenCollection,
     onPushCollection,
+    onPopCollectionTo,
     onBackCollection,
 }: BuildHomeModelParams): HomeViewModel => {
     return {
-        onlineProviderPlatform,
+        account,
         onOpenCollection,
         onPushCollection,
+        onPopCollectionTo,
         onBackCollection,
         surfaceProps: {
             onPlaySong: playSong,
             onBackToPlayer: navigateToPlayer,
+            onOpenLattice: navigateToLattice,
+            onTogglePlayback: togglePlayback,
+            onEnterPlaybackView: enterPlaybackView,
             onRefreshUser: () => refreshOnlineProviderPlaylists(),
-            user: onlineProviderPlatform?.activeProvider?.user ?? user,
-            playlists: onlineProviderPlatform?.activeProvider?.collections.filter(collection => collection.type !== 'cloud') ?? playlists,
-            cloudPlaylist: onlineProviderPlatform?.activeProvider?.collections.find(collection => collection.type === 'cloud') ?? cloudPlaylist,
+            // An anonymous selected provider must not inherit a different platform's account.
+            user: activeProvider ? activeProvider.user : user,
+            playlists: activeProvider?.collections.filter(collection => collection.type !== 'cloud') ?? playlists,
+            cloudPlaylist: activeProvider?.collections.find(collection => collection.type === 'cloud') ?? cloudPlaylist,
             currentTrack: currentSong,
-            isPlaying: playerState === PlayerState.PLAYING,
-            onSelectPlaylist: handlePlaylistSelect,
-            onSelectAlbum: handleAlbumSelect,
-            onSelectArtist: handleArtistSelect,
             onPlayAll: playAll,
             onAddAllToQueue: addAllToQueue,
             onAddSongToQueue: addSongToQueue,
             onStatusMessage,
             focusedPlaylistIndex,
             setFocusedPlaylistIndex,
-            focusedFavoriteAlbumIndex,
-            setFocusedFavoriteAlbumIndex,
-            focusedRadioIndex,
-            setFocusedRadioIndex,
             onOpenSettings: openSettings,
             onSearchCommitted: (query, sourceTab, replace = false) => {
                 navigateToSearch({ query, sourceTab: resolveSearchSource(sourceTab), replace });
             },
-            onSelectLocalAlbum: openLocalAlbumByName,
-            onSelectLocalArtist: openLocalArtistByName,
             localSongs,
             localLibraryCatalog,
             localPlaylists,
             onRefreshLocalSongs,
-            onPlayLocalSong,
             onAddLocalSongToQueue,
             localMusicState,
             setLocalMusicState,
-            onMatchSong,
-            onPlayNavidromeSong,
             onAddNavidromeSongsToQueue,
-            onMatchNavidromeSong,
             navidromeFocusedAlbumIndex,
             setNavidromeFocusedAlbumIndex,
-            pendingNavidromeSelection,
-            onPendingNavidromeSelectionHandled: () => setPendingNavidromeSelection(null),
             stageEnabled: Boolean(stageSource),
-            stageSource,
             stageIsActive: activePlaybackContext === 'stage',
             onOpenStagePlayer: () => {
                 void openStagePlayer();
-            },
-            stageStatus,
-            onToggleStageMode: async (enabled) => {
-                try {
-                    const nextStatus = await window.electron?.setStageEnabled(enabled);
-                    if (nextStatus) {
-                        setStageStatus(nextStatus);
-                        if (!enabled && activePlaybackContext === 'stage') {
-                            leaveStagePlayback();
-                        }
-                        if (!enabled) {
-                            clearStagePlaybackSession();
-                            await clearPersistedStagePlaybackCache();
-                        }
-                    }
-                } catch (error) {
-                    console.error('[buildHomeModel] Failed to toggle stage mode:', error);
-                }
-            },
-            onStageSourceChange: async (source) => {
-                if (!window.electron?.saveSettings) {
-                    return;
-                }
-                await window.electron.saveSettings('STAGE_MODE_SOURCE', source);
-            },
-            onRegenerateStageToken: async () => {
-                const nextStatus = await window.electron?.regenerateStageToken();
-                if (nextStatus) {
-                    setStageStatus(nextStatus);
-                }
-            },
-            onClearStageState: async () => {
-                const nextStatus = await window.electron?.clearStageState();
-                if (nextStatus) {
-                    setStageStatus(nextStatus);
-                    if (activePlaybackContext === 'stage') {
-                        await loadStageSessionIntoPlayback(null);
-                    }
-                }
             },
             theme,
             navidromeEnabled,

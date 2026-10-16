@@ -1,3 +1,4 @@
+import './VisPlayground.css';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, useMotionValue, useMotionValueEvent } from 'framer-motion';
 import { ChevronLeft, Loader2, Pause, Play, Search, Sparkles, Upload, X } from 'lucide-react';
@@ -14,9 +15,13 @@ import {
     DEFAULT_LATENT_BACKGROUND_TUNING,
     DEFAULT_MONET_BACKGROUND_TUNING,
     DEFAULT_MONET_TUNING,
+    DEFAULT_NOMAND_BACKGROUND_TUNING,
     DEFAULT_PARTITA_TUNING,
     DEFAULT_PENDOLO_TUNING,
+    DEFAULT_SONNET_TUNING,
+    DEFAULT_TEMPERA_TUNING,
     DEFAULT_TILT_TUNING,
+    DEFAULT_LUMIERE_TUNING,
     type AudioBands,
     type CappellaAvatarImage,
     type CappellaEmojiImage,
@@ -26,11 +31,15 @@ import {
     type CladdaghTuning,
     type FumeTuning,
     type LatentBackgroundTuning,
+    type LumiereTuning,
     type MonetBackgroundTuning,
     type MonetPortraitImage,
     type MonetTuning,
+    type NomandBackgroundTuning,
     type PartitaTuning,
     type PendoloTuning,
+    type SonnetTuning,
+    type TemperaTuning,
     type StoredCustomLyricsFont,
     type SubtitleContentMode,
     type Theme,
@@ -52,7 +61,6 @@ import VisPlaygroundPreviewHotspots, { type VisPlaygroundEditSection } from './V
 import VisPlaygroundSettingsPanel from './VisPlaygroundSettingsPanel';
 import type { VisualizerBackgroundActions, VisualizerBackgroundConfig } from './backgrounds/definition';
 import { useVisPlaygroundPreviewPlayback } from './useVisPlaygroundPreviewPlayback';
-import './VisPlayground.css';
 
 interface VisPlaygroundProps {
     theme?: Theme;
@@ -68,6 +76,7 @@ interface VisPlaygroundProps {
     subtitleContentMode?: SubtitleContentMode;
     subtitleOverlayOpacity?: number;
     subtitleOverlayBackground?: boolean;
+    subtitleUpcomingLyricsBlur?: boolean;
     showHarmonySubtitle?: boolean;
     harmonySubtitleBackground?: boolean;
     classicTuning?: ClassicTuning;
@@ -80,6 +89,9 @@ interface VisPlaygroundProps {
     dioramaTuning?: DioramaTuning;
     monetTuning?: MonetTuning;
     pendoloTuning?: PendoloTuning;
+    sonnetTuning?: SonnetTuning;
+    temperaTuning?: TemperaTuning;
+    lumiereTuning?: LumiereTuning;
     cappellaCustomEmojiImages?: CappellaEmojiImage[];
     cappellaCustomAvatarImages?: CappellaAvatarImage[];
     monetPortraitImage?: MonetPortraitImage | null;
@@ -114,6 +126,7 @@ interface VisPlaygroundProps {
     onSubtitleContentModeChange?: (mode: SubtitleContentMode) => void;
     onSubtitleOverlayOpacityChange?: (opacity: number) => void;
     onToggleSubtitleOverlayBackground?: (enabled: boolean) => void;
+    onToggleSubtitleUpcomingLyricsBlur?: (enabled: boolean) => void;
     onToggleShowHarmonySubtitle?: (enabled: boolean) => void;
     onToggleHarmonySubtitleBackground?: (enabled: boolean) => void;
     onClassicTuningChange?: (patch: Partial<ClassicTuning>) => void;
@@ -134,6 +147,12 @@ interface VisPlaygroundProps {
     onResetMonetTuning?: () => void;
     onPendoloTuningChange?: (patch: Partial<PendoloTuning>) => void;
     onResetPendoloTuning?: () => void;
+    onSonnetTuningChange?: (patch: Partial<SonnetTuning>) => void;
+    onResetSonnetTuning?: () => void;
+    onTemperaTuningChange?: (patch: Partial<TemperaTuning>) => void;
+    onResetTemperaTuning?: () => void;
+    onLumiereTuningChange?: (patch: Partial<LumiereTuning>) => void;
+    onResetLumiereTuning?: () => void;
     onUploadMonetPortraitImage?: (files: File[]) => Promise<{ ok: boolean; error?: string; }>;
     onClearMonetPortraitImage?: () => Promise<void> | void;
     isLoadingMonetPortraitImage?: boolean;
@@ -289,6 +308,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     subtitleContentMode,
     subtitleOverlayOpacity = 0.6,
     subtitleOverlayBackground = true,
+    subtitleUpcomingLyricsBlur = true,
     showHarmonySubtitle = true,
     harmonySubtitleBackground = true,
     classicTuning = DEFAULT_CLASSIC_TUNING,
@@ -301,6 +321,9 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     dioramaTuning = DEFAULT_DIORAMA_TUNING,
     monetTuning = DEFAULT_MONET_TUNING,
     pendoloTuning = DEFAULT_PENDOLO_TUNING,
+    sonnetTuning = DEFAULT_SONNET_TUNING,
+    temperaTuning = DEFAULT_TEMPERA_TUNING,
+    lumiereTuning = DEFAULT_LUMIERE_TUNING,
     cappellaCustomEmojiImages = [],
     cappellaCustomAvatarImages = [],
     monetPortraitImage = null,
@@ -335,6 +358,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     onSubtitleContentModeChange,
     onSubtitleOverlayOpacityChange,
     onToggleSubtitleOverlayBackground,
+    onToggleSubtitleUpcomingLyricsBlur,
     onToggleShowHarmonySubtitle,
     onToggleHarmonySubtitleBackground,
     onClassicTuningChange,
@@ -355,6 +379,12 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     onResetMonetTuning,
     onPendoloTuningChange,
     onResetPendoloTuning,
+    onSonnetTuningChange,
+    onResetSonnetTuning,
+    onTemperaTuningChange,
+    onResetTemperaTuning,
+    onLumiereTuningChange,
+    onResetLumiereTuning,
     onUploadMonetPortraitImage,
     onClearMonetPortraitImage,
     isLoadingMonetPortraitImage = false,
@@ -371,6 +401,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     const { t } = useTranslation();
     const backgroundOpacity = backgroundConfig?.common?.opacity ?? 0.75;
     const monetBackgroundTuning = backgroundConfig?.monet?.tuning ?? DEFAULT_MONET_BACKGROUND_TUNING;
+    const nomandBackgroundTuning = backgroundConfig?.nomand?.tuning ?? DEFAULT_NOMAND_BACKGROUND_TUNING;
     const latentBackgroundTuning = backgroundConfig?.latent?.tuning ?? DEFAULT_LATENT_BACKGROUND_TUNING;
     const currentTime = useMotionValue(0);
     const audioPower = useMotionValue(0.24);
@@ -407,9 +438,13 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     const [draftTiltTuning, setDraftTiltTuning] = useState<TiltTuning>(tiltTuning);
     const [draftDioramaTuning, setDraftDioramaTuning] = useState<DioramaTuning>(dioramaTuning);
     const [draftMonetBackgroundTuning, setDraftMonetBackgroundTuning] = useState<MonetBackgroundTuning>(monetBackgroundTuning);
+    const [draftNomandBackgroundTuning, setDraftNomandBackgroundTuning] = useState<NomandBackgroundTuning>(nomandBackgroundTuning);
     const [draftLatentBackgroundTuning, setDraftLatentBackgroundTuning] = useState<LatentBackgroundTuning>(latentBackgroundTuning);
     const [draftMonetTuning, setDraftMonetTuning] = useState<MonetTuning>(monetTuning);
     const [draftPendoloTuning, setDraftPendoloTuning] = useState<PendoloTuning>(pendoloTuning);
+    const [draftSonnetTuning, setDraftSonnetTuning] = useState<SonnetTuning>(sonnetTuning);
+    const [draftTemperaTuning, setDraftTemperaTuning] = useState<TemperaTuning>(temperaTuning);
+    const [draftLumiereTuning, setDraftLumiereTuning] = useState<LumiereTuning>(lumiereTuning);
     const [activeEditSection, setActiveEditSection] = useState<VisPlaygroundEditSection>(initialEditSection);
     const fontListRef = React.useRef<HTMLDivElement>(null);
     const fontVirtualListRef = useListRef(null);
@@ -506,6 +541,12 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             draftCladdaghTuning.letterSpacingOffset ?? DEFAULT_CLADDAGH_TUNING.letterSpacingOffset
         ),
     }), [draftCladdaghTuning]);
+    // Renderer resolution reallocates the Pixi backing surface, so keep the preview on the
+    // persisted value while the slider is moving and apply the draft only after release.
+    const previewTemperaTuning = useMemo<TemperaTuning>(() => ({
+        ...draftTemperaTuning,
+        textureResolution: temperaTuning.textureResolution,
+    }), [draftTemperaTuning, temperaTuning.textureResolution]);
     const draftVisualizerTunings = useMemo(() => ({
         classic: draftClassicTuning,
         cadenza: cadenzaTuning,
@@ -517,7 +558,10 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         diorama: draftDioramaTuning,
         monet: draftMonetTuning,
         pendolo: draftPendoloTuning,
-    }), [cadenzaTuning, cappellaTuning, draftClassicTuning, draftDioramaTuning, draftMonetTuning, draftPendoloTuning, draftTiltTuning, resolvedCladdaghTuning, resolvedFumeTuning, resolvedPartitaTuning]);
+        sonnet: draftSonnetTuning,
+        tempera: previewTemperaTuning,
+        lumiere: draftLumiereTuning,
+    }), [cadenzaTuning, cappellaTuning, draftClassicTuning, draftDioramaTuning, draftLumiereTuning, draftMonetTuning, draftPendoloTuning, draftSonnetTuning, draftTiltTuning, previewTemperaTuning, resolvedCladdaghTuning, resolvedFumeTuning, resolvedPartitaTuning]);
     const currentFontLabel = customFontLabel || customFontFamily || t('options.customFont');
     const fontStyleOptions: PresetOption<Theme['fontStyle'] | 'custom'>[] = useMemo(() => ([
         ...builtinFontOptions,
@@ -561,9 +605,13 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
     useEffect(() => { setDraftTiltTuning(tiltTuning); }, [tiltTuning]);
     useEffect(() => { setDraftDioramaTuning(dioramaTuning); }, [dioramaTuning]);
     useEffect(() => { setDraftMonetBackgroundTuning(monetBackgroundTuning); }, [monetBackgroundTuning]);
+    useEffect(() => { setDraftNomandBackgroundTuning(nomandBackgroundTuning); }, [nomandBackgroundTuning]);
     useEffect(() => { setDraftLatentBackgroundTuning(latentBackgroundTuning); }, [latentBackgroundTuning]);
     useEffect(() => { setDraftMonetTuning(monetTuning); }, [monetTuning]);
     useEffect(() => { setDraftPendoloTuning(pendoloTuning); }, [pendoloTuning]);
+    useEffect(() => { setDraftSonnetTuning(sonnetTuning); }, [sonnetTuning]);
+    useEffect(() => { setDraftTemperaTuning(temperaTuning); }, [temperaTuning]);
+    useEffect(() => { setDraftLumiereTuning(lumiereTuning); }, [lumiereTuning]);
     useEffect(() => { setActiveEditSection(initialEditSection); }, [initialEditSection]);
 
     useVisPlaygroundPreviewPlayback({
@@ -622,9 +670,15 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             resetDioramaTuning: onResetDioramaTuning,
             resetMonetTuning: onResetMonetTuning,
             resetPendoloTuning: onResetPendoloTuning,
+            resetSonnetTuning: onResetSonnetTuning,
+            resetTemperaTuning: onResetTemperaTuning,
+            resetLumiereTuning: onResetLumiereTuning,
             setDraftFumeTuning,
             setDraftCladdaghTuning,
             setDraftPendoloTuning,
+            setDraftSonnetTuning,
+            setDraftTemperaTuning,
+            setDraftLumiereTuning,
         });
     };
 
@@ -923,6 +977,16 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         }
     };
 
+    const handleNomandBackgroundTuningDraft = (patch: Partial<NomandBackgroundTuning>) => {
+        const next = { ...draftNomandBackgroundTuning, ...patch };
+        setDraftNomandBackgroundTuning(next);
+        if (!isDraggingSlider.current) {
+            backgroundActions?.nomand?.onTuningChange?.(patch);
+        } else {
+            pendingCommitRef.current = () => backgroundActions?.nomand?.onTuningChange?.(patch);
+        }
+    };
+
     const handleLatentBackgroundTuningDraft = (patch: Partial<LatentBackgroundTuning>) => {
         setDraftLatentBackgroundTuning(prev => ({ ...prev, ...patch }));
         if (!isDraggingSlider.current) {
@@ -952,6 +1016,35 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
         }
     };
 
+    const handleSonnetTuningDraft = (patch: Partial<SonnetTuning>) => {
+        const next = { ...draftSonnetTuning, ...patch };
+        setDraftSonnetTuning(next);
+        if (!isDraggingSlider.current) {
+            onSonnetTuningChange?.(patch);
+        } else {
+            pendingCommitRef.current = () => onSonnetTuningChange?.(patch);
+        }
+    };
+
+    const handleTemperaTuningDraft = (patch: Partial<TemperaTuning>) => {
+        const next = { ...draftTemperaTuning, ...patch };
+        setDraftTemperaTuning(next);
+        if (!isDraggingSlider.current) {
+            onTemperaTuningChange?.(patch);
+        } else {
+            pendingCommitRef.current = () => onTemperaTuningChange?.(patch);
+        }
+    };
+
+    const handleLumiereTuningDraft = (patch: Partial<LumiereTuning>) => {
+        setDraftLumiereTuning(prev => ({ ...prev, ...patch }));
+        if (!isDraggingSlider.current) {
+            onLumiereTuningChange?.(patch);
+        } else {
+            pendingCommitRef.current = () => onLumiereTuningChange?.(patch);
+        }
+    };
+
     const handleResetSubtitleSettings = () => {
         setDraftSubtitleOverlayOpacity(0.6);
         setDraftSubtitleFontScale(1);
@@ -962,6 +1055,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             onToggleShowSubtitleTranslation?.(true);
         }
         onToggleSubtitleOverlayBackground?.(true);
+        onToggleSubtitleUpcomingLyricsBlur?.(true);
         onToggleShowHarmonySubtitle?.(true);
         onToggleHarmonySubtitleBackground?.(true);
         onSubtitleOverlayOpacityChange?.(0.6);
@@ -1008,6 +1102,10 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             ...backgroundConfig?.monet,
             tuning: draftMonetBackgroundTuning,
         },
+        nomand: {
+            ...backgroundConfig?.nomand,
+            tuning: draftNomandBackgroundTuning,
+        },
         latent: {
             ...backgroundConfig?.latent,
             tuning: draftLatentBackgroundTuning,
@@ -1025,6 +1123,14 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
             onResetTuning: () => {
                 setDraftMonetBackgroundTuning(DEFAULT_MONET_BACKGROUND_TUNING);
                 backgroundActions?.monet?.onResetTuning?.();
+            },
+        },
+        nomand: {
+            ...backgroundActions?.nomand,
+            onTuningChange: handleNomandBackgroundTuningDraft,
+            onResetTuning: () => {
+                setDraftNomandBackgroundTuning(DEFAULT_NOMAND_BACKGROUND_TUNING);
+                backgroundActions?.nomand?.onResetTuning?.();
             },
         },
         latent: {
@@ -1053,7 +1159,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                 exit={{ opacity: 0, y: 18, scale: 0.98 }}
                 transition={{ duration: 0.2, ease: 'easeOut' }}
                 onClick={(event) => event.stopPropagation()}
-                className={`mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden rounded-[32px] border ${borderColor} ${glassBg} shadow-[0_24px_80px_rgba(0,0,0,0.28)]`}
+                data-ponder="vis-playground"
+                className={`vis-playground-shell mx-auto flex h-full max-w-[1600px] flex-col overflow-hidden rounded-[32px] border ${borderColor} ${glassBg} shadow-[0_24px_80px_rgba(0,0,0,0.28)]`}
             >
                 <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-4 sm:px-6">
                     <div className="flex items-center gap-3 min-w-0">
@@ -1073,7 +1180,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                     </div>
                 </div>
 
-                <div className="vis-playground-layout min-h-0 flex-1 gap-4 p-4 sm:p-6">
+                <div className="vis-playground-layout min-h-0 min-w-0 flex-1 gap-4 p-4 sm:p-6">
                     <div className="vis-playground-preview relative min-h-0 min-w-0 overflow-hidden rounded-[28px] border border-white/10 bg-black/20">
                         <div className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs uppercase tracking-[0.22em] backdrop-blur-md" style={{ color: 'rgba(255,255,255,0.78)' }}>
                             <Sparkles size={13} />
@@ -1105,6 +1212,7 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                                 subtitleFontScale={normalizedSubtitleFontScale}
                                 subtitleOverlayOpacity={draftSubtitleOverlayOpacity}
                                 subtitleOverlayBackground={subtitleOverlayBackground}
+                                subtitleUpcomingLyricsBlur={subtitleUpcomingLyricsBlur}
                                 showHarmonySubtitle={showHarmonySubtitle}
                                 harmonySubtitleBackground={harmonySubtitleBackground}
                                 hideTranslationSubtitle={hideTranslationSubtitle}
@@ -1201,6 +1309,12 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                         onMonetTuningChange={handleMonetTuningDraft}
                         pendoloTuning={draftPendoloTuning}
                         onPendoloTuningChange={handlePendoloTuningDraft}
+                        sonnetTuning={draftSonnetTuning}
+                        onSonnetTuningChange={handleSonnetTuningDraft}
+                        temperaTuning={draftTemperaTuning}
+                        onTemperaTuningChange={handleTemperaTuningDraft}
+                        lumiereTuning={draftLumiereTuning}
+                        onLumiereTuningChange={handleLumiereTuningDraft}
                         onResetMonetTuning={onResetMonetTuning}
                         monetPortraitImage={monetPortraitImage}
                         onUploadMonetPortraitImage={onUploadMonetPortraitImage}
@@ -1215,6 +1329,8 @@ const VisPlayground: React.FC<VisPlaygroundProps> = ({
                         onSubtitleOverlayOpacityChange={handleSubtitleOverlayOpacityDraft}
                         subtitleOverlayBackground={subtitleOverlayBackground}
                         onToggleSubtitleOverlayBackground={onToggleSubtitleOverlayBackground}
+                        subtitleUpcomingLyricsBlur={subtitleUpcomingLyricsBlur}
+                        onToggleSubtitleUpcomingLyricsBlur={onToggleSubtitleUpcomingLyricsBlur}
                         showHarmonySubtitle={showHarmonySubtitle}
                         onToggleShowHarmonySubtitle={onToggleShowHarmonySubtitle}
                         harmonySubtitleBackground={harmonySubtitleBackground}

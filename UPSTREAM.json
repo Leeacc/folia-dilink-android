@@ -1,9 +1,12 @@
 {
-  "repository": "https://github.com/chthollyphile/folia-sonnet",
-  "commit": "5a2c3148cc78c51a5c2df15d7d0d34c120c24873",
-  "foliaVersion": "0.6.7",
+  "repository": "https://github.com/chthollyphile/folia-major",
+  "tag": "v0.7.20",
+  "commit": "1b39fd868e2ddda95788f1baa839c032f3e7a285",
+  "foliaVersion": "0.7.20",
   "capacitorVersion": "8.4.2",
-  "referenceMajorRepository": "https://github.com/chthollyphile/folia-major",
-  "referenceMajorCommit": "d824c0b854e54d5411cb072092999823e9bd7071",
-  "referenceMajorVersion": "0.7.16"
+  "previousBase": {
+    "repository": "https://github.com/chthollyphile/folia-sonnet",
+    "commit": "5a2c3148cc78c51a5c2df15d7d0d34c120c24873",
+    "version": "0.6.7"
+  }
 }

@@ -9,7 +9,7 @@ import { formatSongName } from '../../utils/songNameFormatter';
 import { migrateMatchedLyricsCarrierRenderHints } from '../../utils/lyrics/storageMigration';
 import { calculateMatchScore } from '../../utils/lyrics/matchScore';
 import { buildLyricSearchQuery } from '../../utils/lyrics/searchQuery';
-import { fetchLyricsForMatchSource, LYRIC_MATCH_SOURCES, searchLyricsByMatchSource, sourceSupportsManualSearch } from '../../utils/lyrics/lyricMatchSources';
+import { fetchLyricsForMatchSource, LYRIC_MATCH_SOURCES, searchLyricsByMatchSource } from '../../utils/lyrics/lyricMatchSources';
 import {
     getLyricMatchSourceLabel,
     getMatchResultAlbumName,
@@ -18,7 +18,9 @@ import {
     type LyricMatchSource,
 } from './lyricMatchResultHelpers';
 import { LyricPreviewPanel } from './LyricPreviewPanel';
+import { getSizedCoverUrl } from '../../utils/coverUrl';
 import { getProviderSongMetadata } from '../../services/onlineMusic/songMetadata';
+import { hasRenderableLyrics } from '../../utils/lyrics/validity';
 
 export interface NavidromeMatchData {
     matchedSongId?: MediaId;
@@ -109,9 +111,7 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
     }, [song]);
 
     const handleSearch = async (query?: string) => {
-        const q = sourceSupportsManualSearch(source)
-            ? (query || searchQuery)
-            : buildLyricSearchQuery(songInfo.title, songInfo.artist, songInfo.album || '');
+        const q = query || searchQuery;
         if (!q.trim()) return;
 
         setIsSearching(true);
@@ -188,7 +188,10 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
         try {
             // Always fetch lyrics
             const processed = await fetchLyricsForMatchSource(source, selectedResult);
-            if (!processed) return;
+            if (!processed || (!hasRenderableLyrics(processed.lyrics) && !processed.isPureMusic)) {
+                alert(t('localMusic.noLyricsAvailable'));
+                return;
+            }
             const parsedLyrics: LyricData | null = processed ? processed.lyrics : null;
 
             const matchData: NavidromeMatchData = {
@@ -278,34 +281,32 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
                                     );
                                 })}
                             </div>
-                            {sourceSupportsManualSearch(source) && (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        handleSearch();
-                                    }}
-                                    className="flex gap-3"
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleSearch();
+                                }}
+                                className="flex gap-3"
+                            >
+                                <div className={`flex-1 flex items-center gap-3 rounded-2xl border px-4 py-3 ${inputBg}`}>
+                                    <Search size={18} className={`opacity-40 ${textSecondary}`} />
+                                    <input
+                                        type="text"
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        placeholder={t('localMusic.searchForSong')}
+                                        className={`flex-1 bg-transparent outline-none text-sm ${textPrimary}`}
+                                        autoFocus
+                                    />
+                                </div>
+                                <button
+                                    type="submit"
+                                    disabled={isSearching}
+                                    className={`px-4 rounded-2xl text-sm font-medium transition-colors ${searchBtnBg}`}
                                 >
-                                    <div className={`flex-1 flex items-center gap-3 rounded-2xl border px-4 py-3 ${inputBg}`}>
-                                        <Search size={18} className={`opacity-40 ${textSecondary}`} />
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder={t('localMusic.searchForSong')}
-                                            className={`flex-1 bg-transparent outline-none text-sm ${textPrimary}`}
-                                            autoFocus
-                                        />
-                                    </div>
-                                    <button
-                                        type="submit"
-                                        disabled={isSearching}
-                                        className={`px-4 rounded-2xl text-sm font-medium transition-colors ${searchBtnBg}`}
-                                    >
-                                        {isSearching ? <Loader2 size={16} className="animate-spin" /> : t('localMusic.search')}
-                                    </button>
-                                </form>
-                            )}
+                                    {isSearching ? <Loader2 size={16} className="animate-spin" /> : t('localMusic.search')}
+                                </button>
+                            </form>
                         </div>
                         <div className="flex-1 overflow-y-auto custom-scrollbar px-4 pb-4">
                             {isSearching ? (
@@ -327,7 +328,7 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
                                             <div key={resultKey} onClick={() => setSelectedResult(result)} className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all border ${selectedKey === resultKey ? resultItemSelected : resultItemBg}`}>
                                                 <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-zinc-800">
                                                     {resultCoverUrl ? (
-                                                        <img src={resultCoverUrl} alt={result.name} className="w-full h-full object-cover" />
+                                                        <img src={getSizedCoverUrl(resultCoverUrl, 512)} alt={result.name} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
                                                             <Music size={16} className="opacity-20" />
@@ -359,7 +360,7 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
                             {/* Cover Image */}
                             <div className="w-32 h-32 min-h-[64px] rounded-2xl overflow-hidden bg-zinc-800 shadow-md flex-shrink transition-all duration-300">
                                 {selectedCoverUrl || coverUrl ? (
-                                    <img src={selectedCoverUrl || coverUrl || ''} alt="Cover" className="w-full h-full object-cover" />
+                                    <img src={getSizedCoverUrl(selectedCoverUrl || coverUrl, 512)} alt="Cover" decoding="async" className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center">
                                         <Music size={28} className="opacity-10" />
@@ -393,7 +394,11 @@ const NaviLyricMatchModal: React.FC<NaviLyricMatchModalProps> = ({ song, onClose
 
                         {/* Lyric Preview Panel */}
                         <div className="w-full h-28 flex-shrink-0 mt-4 flex flex-col">
-                            <LyricPreviewPanel selectedResult={selectedResult} source={source} isDaylight={isDaylight} />
+                            <LyricPreviewPanel
+                                selectedResult={selectedResult}
+                                source={source}
+                                isDaylight={isDaylight}
+                            />
                         </div>
                     </div>
                 </div>

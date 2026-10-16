@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react';
 import type { MotionValue } from 'framer-motion';
 import { LyricParserFactory } from '../utils/lyrics/LyricParserFactory';
-import { getFromCacheWithMigration, getLocalSongs, removeFromCache, saveLocalSong, saveToCache } from '../services/db';
+import { getFromCacheWithMigration, getLocalSong, getLocalSongs, removeFromCache, saveLocalSong, saveToCache } from '../services/db';
 import { getCachedCoverUrl, loadCachedOrFetchCover } from '../services/coverCache';
-import { ensureLocalSongEmbeddedCover, getAudioFromLocalSong } from '../services/localMusicService';
-import { addSongsToLocalPlaylist, createLocalPlaylist, getLocalPlaylists, setLocalSongFavorite } from '../services/localPlaylistService';
+import { ensureLocalSongCoverAsset, getAudioFromLocalSong } from '../services/localMusicService';
+import { addSongsToLocalPlaylist, buildCanonicalLocalSongIdIndex, createLocalPlaylist, getLocalPlaylists, setLocalSongFavorite } from '../services/localPlaylistService';
 import { applyLocalLibraryEntityDisplay, buildLocalQueue, buildNavidromeQueue, buildUnifiedLocalSong, buildUnifiedNavidromeSong, resolveLocalSongMetadata } from '../services/playbackAdapters';
 import { getPrefetchedData } from '../services/prefetchService';
+import { retireBlobUrl } from '../services/playbackBlobUrls';
 import type { ThemeCacheSongKey } from '../services/themeCache';
 import { hasRenderableLyrics } from '../utils/appPlaybackHelpers';
 import {
@@ -24,48 +25,69 @@ import {
 import { hydrateNavidromeLyricPayload, resolvePreferredNavidromeLyrics } from '../utils/appNavidromeLyrics';
 import { migrateLyricDataRenderHints } from '../utils/lyrics/renderHints';
 import { migrateMatchedLyricsCarrierRenderHints } from '../utils/lyrics/storageMigration';
-import { useSettingsUiStore } from '../stores/useSettingsUiStore';
 import { autoMatchBestLyric } from '../utils/lyrics/autoMatchBestLyric';
 import { resolveExplicitFileTimedLyricFormat } from '../utils/lyrics/formatDetection';
+import { applyUploadedLocalLyrics } from '../utils/lyrics/localLyricsUpload';
 import { omni } from '../services/onlineMusic/omni';
 import { getProviderSongMetadata } from '../services/onlineMusic/songMetadata';
 import { getSongResourceCacheKey } from '../services/onlineMusic/resourceKeys';
 import { getSongCacheWithLegacyMigration } from '../services/onlineMusic/resourceCache';
+import { buildLocalSourceRevision, buildNavidromeSourceRevision } from '../services/playbackRecovery/sourceRevision';
+import { getPlaybackRepresentationForRevision } from '../services/playbackRecovery/representationRegistry';
 import { getProviderCacheKey } from '../services/onlineMusic/providerStorage';
 import { getNavidromeConfig, navidromeApi } from '../services/navidromeService';
+import { notifyPlaybackFailed } from '../services/hostExtensionHooks';
 import { PlayerState } from '../types';
 import type { LyricData, LocalPlaylist, LocalSong, OnlineLyricsState, QueueAddBehavior, SongResult, StatusMessage } from '../types';
 import type { AudioQualityPreference, MediaId, ProviderCollection } from '../types/onlineMusic';
-import type { PlaybackSnapshot, PlaybackNavigationOptions } from '../types/appPlayback';
+import type { LibraryPlayOptions, PlaybackSnapshot } from '../types/appPlayback';
 import type { NavidromeSong } from '../types/navidrome';
 import type { NavidromeMatchData } from '../components/modal/NaviLyricMatchModal';
 import { applyQueueAddBehavior } from '../utils/queueAddBehavior';
 import { loadOnlineLyricsState, resolveOnlineLyrics, saveOnlineLyricsState, getOnlineLyricsStateCacheKey } from '../utils/onlineLyricsState';
-import { createSafeObjectUrl, getBlobObjectUrlSignature, isBlob } from '../utils/blobGuards';
+import { hasLocalSongCover } from '../utils/localSongCover';
+import { isSameLocalSongRecord } from '../utils/localSongRecordEquality';
+import { getLocalCoverAssetUrl } from '../services/localCoverAssetUrl';
 import { applyMatchedMetadata } from '../services/localLibraryCatalogService';
+import { setLocalSongPureMusicMark } from '../services/localSongMatchSelectionService';
 import { buildLocalSongLyricMatchContext, shouldRefreshLocalSongLyricsFromMetadata, shouldRunLocalSongAutomaticMatch } from '../utils/lyrics/localSongMatchContext';
 import { getLocalLibraryCatalogSnapshot } from '../services/localLibraryEntityRepository';
+import { setStatusMessage as setStatusMsg } from '../stores/useStatusMessageStore';
+import { useLyricSettingsStore } from '../stores/useLyricSettingsStore';
+import { setActiveLocalLyricsSource, setAudioSrc, setCachedCoverUrl, setCurrentLineIndex, setCurrentSong, setPlayQueue, setPlayerState } from '../stores/usePlaybackStore';
+import { useStableActionSurface } from './useStableCallbacks';
+import { useTranslation } from 'react-i18next';
+import { usePlaybackStore } from '../stores/usePlaybackStore';
+import { useAudioSettingsStore } from '../stores/useAudioSettingsStore';
+import { useLibraryStore } from '../stores/useLibraryStore';
+import { setIsPanelOpen } from '../stores/useAppViewStore';
+import { currentTime } from '../stores/motionSignals';
+import { resolveLocalSongLyrics } from '../utils/lyrics/localSongLyrics';
+import { detectLyricFileIssues } from '../utils/lyrics/lyricFileIssues';
 
 // src/hooks/useLibraryPlaybackController.ts
 
-const parseLocalSongLyrics = (song: Pick<LocalSong, 'localLyricsContent' | 'localTranslationLyricsContent' | 'localLyricsFormat'>) => {
-    if (!song.localLyricsContent) {
-        return Promise.resolve(null);
-    }
-
-    return LyricParserFactory.parse({
-        type: 'local',
-        lrcContent: song.localLyricsContent,
-        tLrcContent: song.localTranslationLyricsContent,
-        formatHint: song.localLyricsFormat,
-    });
-};
-
 type SetState<T> = Dispatch<SetStateAction<T>>;
 
-type LocalCoverObjectUrlEntry = {
-    signature: string;
-    url: string;
+// 报告本地歌曲放不了（hostExtensionHooks.notifyPlaybackFailed）时用的歌曲。记录残缺、构造不出统一歌曲时报 null：
+// 报告本身不能在失败路径上再抛错。
+const toReportedLocalSong = (localSong: LocalSong): SongResult | null => {
+    try {
+        return buildUnifiedLocalSong({ localSong, matchedSong: null, coverUrl: null, preferOnlineMetadata: false });
+    } catch {
+        return null;
+    }
+};
+
+// A broken sidecar lyric file is reported once per song per session; the Folder tab keeps the details.
+const reportedLyricFileIssueSongIds = new Set<string>();
+
+const shouldReportShiftedLyricFile = (localSong: LocalSong, lyricsSource: string | null): boolean => {
+    if (lyricsSource !== 'local' || reportedLyricFileIssueSongIds.has(localSong.id)) return false;
+    const issues = detectLyricFileIssues(localSong.localLyricsContent, localSong.localLyricsFormat);
+    if (!issues.includes('translation-shifted-to-end-time')) return false;
+    reportedLyricFileIssueSongIds.add(localSong.id);
+    return true;
 };
 
 const isBlobObjectUrl = (url: string | null | undefined): url is string => (
@@ -73,30 +95,12 @@ const isBlobObjectUrl = (url: string | null | undefined): url is string => (
 );
 
 type UseLibraryPlaybackControllerParams = {
-    t: (key: string, fallback?: string) => string;
-    audioQuality: AudioQualityPreference;
-    queueAddBehavior: QueueAddBehavior;
-    currentSong: SongResult | null;
-    lyrics: LyricData | null;
-    playQueue: SongResult[];
     likedSongIds: Set<MediaId>;
-    starredNavidromeSongIds: Set<string>;
     userId?: MediaId;
-    currentTime: MotionValue<number>;
-    setCurrentSong: SetState<SongResult | null>;
     setLyrics: (nextLyrics: LyricData | null) => void;
-    setCachedCoverUrl: SetState<string | null>;
-    setAudioSrc: SetState<string | null>;
-    setPlayQueue: SetState<SongResult[]>;
-    setPlayerState: SetState<PlayerState>;
-    setCurrentLineIndex: SetState<number>;
-    setDuration: SetState<number>;
     setIsLyricsLoading: SetState<boolean>;
-    setStatusMsg: SetState<StatusMessage | null>;
-    setIsPanelOpen: SetState<boolean>;
     setLikedSongIds: Dispatch<SetStateAction<Set<MediaId>>>;
-    setStarredNavidromeSongIds: Dispatch<SetStateAction<Set<string>>>;
-    navigateToPlayer: () => void;
+    navigateToPlaybackView: () => void;
     persistLastPlaybackCache: (song: SongResult | null, queue: SongResult[]) => Promise<void>;
     restoreCachedThemeForSong: (songOrId: ThemeCacheSongKey | SongResult, options?: {
         allowLastUsedFallback?: boolean;
@@ -111,30 +115,12 @@ type UseLibraryPlaybackControllerParams = {
 
 // Owns local and Navidrome playback helpers so App.tsx can stay focused on assembly.
 export function useLibraryPlaybackController({
-    t,
-    audioQuality,
-    queueAddBehavior,
-    currentSong,
-    lyrics,
-    playQueue,
     likedSongIds,
-    starredNavidromeSongIds,
     userId,
-    currentTime,
-    setCurrentSong,
     setLyrics,
-    setCachedCoverUrl,
-    setAudioSrc,
-    setPlayQueue,
-    setPlayerState,
-    setCurrentLineIndex,
-    setDuration,
     setIsLyricsLoading,
-    setStatusMsg,
-    setIsPanelOpen,
     setLikedSongIds,
-    setStarredNavidromeSongIds,
-    navigateToPlayer,
+    navigateToPlaybackView,
     persistLastPlaybackCache,
     restoreCachedThemeForSong,
     interruptStagePlaybackForMainTransition,
@@ -143,26 +129,42 @@ export function useLibraryPlaybackController({
     currentSongRef,
     currentOnlineAudioUrlFetchedAtRef,
 }: UseLibraryPlaybackControllerParams) {
+    // Read here rather than passed in: all store fields, a module-level signal, or i18n.
+    const { t } = useTranslation();
+    const audioQuality = useAudioSettingsStore(state => state.audioQuality);
+    const queueAddBehavior = useAudioSettingsStore(state => state.queueAddBehavior);
+    const currentSong = usePlaybackStore(state => state.currentSong);
+    const lyrics = usePlaybackStore(state => state.lyrics);
+    const playQueue = usePlaybackStore(state => state.playQueue);
+    const starredNavidromeSongIds = useLibraryStore(state => state.starredNavidromeSongIds);
+    const setStarredNavidromeSongIds = useLibraryStore(state => state.setStarredNavidromeSongIds);
+
     const [localSongs, setLocalSongs] = useState<LocalSong[]>([]);
     const [localPlaylists, setLocalPlaylists] = useState<LocalPlaylist[]>([]);
     const [showLyricMatchModal, setShowLyricMatchModal] = useState(false);
     const [showNaviLyricMatchModal, setShowNaviLyricMatchModal] = useState(false);
     const [showOnlineLyricMatchModal, setShowOnlineLyricMatchModal] = useState(false);
-    const localCoverObjectUrlsRef = useRef<Map<string, LocalCoverObjectUrlEntry>>(new Map());
     const managedCachedCoverObjectUrlRef = useRef<string | null>(null);
+    /** 库内播放（onPlayLocalSong / onPlayNavidromeSong）的递增请求 id：更新的库内播放取代还在等待的旧请求。 */
+    const libraryPlayRequestIdRef = useRef(0);
     const resolveLocalSongRecord = useCallback((song: SongResult | null | undefined): LocalSong | undefined => {
         const songId = (song as SongResult & { localRef?: { songId: string } } | null | undefined)?.localRef?.songId;
         return songId ? localSongs.find(localSong => localSong.id === songId) : undefined;
     }, [localSongs]);
 
-    const isRegisteredLocalCoverObjectUrl = useCallback((url: string) => {
-        for (const entry of localCoverObjectUrlsRef.current.values()) {
-            if (entry.url === url) {
-                return true;
-            }
+    // `localSongs` only refreshes on explicit reloads, so a panel action can otherwise spread a
+    // record that predates the last write and persist it back over the newer fields.
+    const resolveLatestLocalSongRecord = useCallback(async (song: SongResult | null | undefined): Promise<LocalSong | undefined> => {
+        const songId = (song as SongResult & { localRef?: { songId: string } } | null | undefined)?.localRef?.songId;
+        if (!songId) return undefined;
+        try {
+            const songs = await getLocalSongs();
+            return songs.find(localSong => localSong.id === songId) ?? resolveLocalSongRecord(song);
+        } catch (error) {
+            console.error('Failed to reload local song record:', error);
+            return resolveLocalSongRecord(song);
         }
-        return false;
-    }, []);
+    }, [resolveLocalSongRecord]);
 
     const revokeManagedCachedCoverObjectUrl = useCallback(() => {
         if (managedCachedCoverObjectUrlRef.current) {
@@ -178,72 +180,18 @@ export function useLibraryPlaybackController({
             managedCachedCoverObjectUrlRef.current = null;
         }
 
-        if (isBlobObjectUrl(nextUrl) && !isRegisteredLocalCoverObjectUrl(nextUrl)) {
+        if (isBlobObjectUrl(nextUrl)) {
             managedCachedCoverObjectUrlRef.current = nextUrl;
         }
 
         setCachedCoverUrl(nextUrl);
-    }, [isRegisteredLocalCoverObjectUrl, setCachedCoverUrl]);
-
-    const clearLocalCoverObjectUrls = useCallback(() => {
-        localCoverObjectUrlsRef.current.forEach(entry => URL.revokeObjectURL(entry.url));
-        localCoverObjectUrlsRef.current.clear();
-    }, []);
-
-    const pruneLocalCoverObjectUrls = useCallback((activeLocalSongIds: Set<string>) => {
-        localCoverObjectUrlsRef.current.forEach((entry, localSongId) => {
-            if (!activeLocalSongIds.has(localSongId)) {
-                URL.revokeObjectURL(entry.url);
-                localCoverObjectUrlsRef.current.delete(localSongId);
-            }
-        });
-    }, []);
-
-    const getOrCreateLocalCoverObjectUrl = useCallback((song: LocalSong) => {
-        if (!isBlob(song.embeddedCover)) {
-            return null;
-        }
-
-        const signature = getBlobObjectUrlSignature(song.embeddedCover, [
-            song.id,
-            song.fileSignature,
-            song.fileSize,
-            song.fileLastModified,
-        ]);
-        const cached = localCoverObjectUrlsRef.current.get(song.id);
-        if (cached?.signature === signature) {
-            return cached.url;
-        }
-
-        if (cached) {
-            URL.revokeObjectURL(cached.url);
-        }
-
-        const url = createSafeObjectUrl(song.embeddedCover);
-        if (!url) return null;
-        localCoverObjectUrlsRef.current.set(song.id, { signature, url });
-        return url;
-    }, []);
+    }, [setCachedCoverUrl]);
 
     useEffect(() => {
         return () => {
-            clearLocalCoverObjectUrls();
             revokeManagedCachedCoverObjectUrl();
         };
-    }, [clearLocalCoverObjectUrls, revokeManagedCachedCoverObjectUrl]);
-
-    useEffect(() => {
-        const activeLocalSongIds = new Set<string>();
-        if (isLocalPlaybackSong(currentSong)) {
-            activeLocalSongIds.add(currentSong.localRef.songId);
-        }
-        playQueue.forEach(song => {
-            if (isLocalPlaybackSong(song)) {
-                activeLocalSongIds.add(song.localRef.songId);
-            }
-        });
-        pruneLocalCoverObjectUrls(activeLocalSongIds);
-    }, [currentSong, playQueue, pruneLocalCoverObjectUrls]);
+    }, [revokeManagedCachedCoverObjectUrl]);
 
     useEffect(() => {
         if (!isLocalPlaybackSong(currentSong)) {
@@ -258,6 +206,24 @@ export function useLibraryPlaybackController({
         } catch (error) {
             console.error('Failed to load local songs:', error);
         }
+    }, []);
+
+    // 按 id 把给定的最新记录换进 localSongs，不重读整张 local_music 表。
+    // 内容与状态里那条相同的记录不换（库里读回的总是新对象，只比引用会每次都换），没有实际替换时保持原数组：
+    // localSongs 的引用一变，useLocalLibraryCatalog 就要整表重读目录，曲库视图也跟着重算。
+    const patchLocalSongsInState = useCallback((records: LocalSong[]) => {
+        if (records.length === 0) return;
+        const recordsById = new Map(records.map(record => [record.id, record]));
+        setLocalSongs(previous => {
+            let changed = false;
+            const next = previous.map(song => {
+                const record = recordsById.get(song.id);
+                if (!record || isSameLocalSongRecord(record, song)) return song;
+                changed = true;
+                return record;
+            });
+            return changed ? next : previous;
+        });
     }, []);
 
     const loadLocalPlaylists = useCallback(async () => {
@@ -282,9 +248,25 @@ export function useLibraryPlaybackController({
             const localSong = songsById.get(snapshot.localRef.songId);
             return localSong ? buildLocalQueue([localSong], undefined, catalog)[0] || null : null;
         };
+        const playingBefore = usePlaybackStore.getState().currentSong;
         setCurrentSong(previous => previous ? rebuild(previous) : null);
         setPlayQueue(previous => previous.map(rebuild).filter((song): song is SongResult => Boolean(song)));
-    }, [loadLocalPlaylists, setCurrentSong, setPlayQueue]);
+
+        // 正在播放的这首被标成 / 取消纯音乐（窗口、资料库或命令面板）时，就地换歌词，不重新播放。
+        if (!isLocalPlaybackSong(playingBefore)) return;
+        const record = songsById.get(playingBefore.localRef.songId);
+        const rebuilt = rebuild(playingBefore);
+        if (!record || !rebuilt || Boolean(rebuilt.isPureMusic) === Boolean(playingBefore.isPureMusic)) return;
+        const resolvedLyrics = await resolveLocalSongLyrics(record, useLyricSettingsStore.getState().localLyricsPriority);
+        const shown = usePlaybackStore.getState();
+        if (!isSamePlaybackSong(shown.currentSong, playingBefore)) return;
+        // 屏幕上已经是这份来源与有无歌词（例如快照标志过期造成的「翻转」），就不换，免得清掉当前行。
+        if (resolvedLyrics.source === shown.activeLocalLyricsSource
+            && Boolean(resolvedLyrics.lyrics?.lines.length) === Boolean(shown.lyrics?.lines.length)) return;
+        setLyrics(resolvedLyrics.lyrics);
+        setActiveLocalLyricsSource(resolvedLyrics.source);
+        setCurrentLineIndex(-1);
+    }, [loadLocalPlaylists, setCurrentSong, setLyrics, setPlayQueue]);
 
     const getFavoriteLocalPlaylist = useMemo(
         () => localPlaylists.find(playlist => playlist.isFavorite) ?? null,
@@ -316,13 +298,17 @@ export function useLibraryPlaybackController({
         };
     }, [loadBaseOnlineLyrics, lyrics]);
 
+    // 同一文件被导入两次时，歌单里留下的是 canonical 那一份的 id，而播放中的可能是另一份副本。
+    const canonicalLocalSongIds = useMemo(() => buildCanonicalLocalSongIdIndex(localSongs), [localSongs]);
+
     const isLocalSongLiked = useCallback((song: SongResult | null) => {
         if (!song || !isLocalPlaybackSong(song) || !getFavoriteLocalPlaylist) {
             return false;
         }
 
-        return getFavoriteLocalPlaylist.songIds.includes(song.localRef.songId);
-    }, [getFavoriteLocalPlaylist]);
+        const songId = song.localRef.songId;
+        return getFavoriteLocalPlaylist.songIds.includes(canonicalLocalSongIds.get(songId) ?? songId);
+    }, [canonicalLocalSongIds, getFavoriteLocalPlaylist]);
 
     const saveCurrentQueueAsLocalPlaylist = useCallback(async (name: string) => {
         const trimmedName = name.trim();
@@ -375,6 +361,15 @@ export function useLibraryPlaybackController({
 
     const addCurrentSongToOnlinePlaylist = useCallback(async (playlist: ProviderCollection) => {
         if (!currentSong) throw new Error('No current song');
+        if (!omni.canAddSongToPlaylist(currentSong)) {
+            const source = getPlaybackSourceRef(currentSong);
+            const provider = source.kind === 'online' ? omni.getProviderLabel(source.providerId) : '';
+            setStatusMsg({
+                type: 'info',
+                text: t('status.providerPlaylistMutationUnavailable').replace('{{provider}}', provider),
+            });
+            return;
+        }
         await omni.addSongToPlaylist(currentSong, playlist);
         await removeFromCache(getProviderCacheKey(playlist.providerId, `playlist_tracks_${playlist.id}`));
         await removeFromCache(getProviderCacheKey(playlist.providerId, `playlist_detail_${playlist.id}`));
@@ -416,61 +411,46 @@ export function useLibraryPlaybackController({
     const handleLocalSongMatch = useCallback(async (localSong: LocalSong): Promise<{ updatedLocalSong: LocalSong; matchedSongResult: SongResult | null; }> => {
         let updatedLocalSong = localSong;
         let matchedSongResult: SongResult | null = null;
-        const onlineFirst = useSettingsUiStore.getState().localLyricsPriority === 'online';
+        const onlineFirst = useLyricSettingsStore.getState().localLyricsPriority === 'online';
         const needsLyricsMatch = (
             (onlineFirst || (!localSong.hasLocalLyrics && !localSong.hasEmbeddedLyrics))
             && (!localSong.matchedLyrics && !localSong.matchedIsPureMusic
                 || shouldRefreshLocalSongLyricsFromMetadata(localSong))
         );
-        const needsCoverMatch = !isBlob(localSong.embeddedCover) && !localSong.onlineMetadata?.coverUrl;
+        const needsCoverMatch = !hasLocalSongCover(localSong) && !localSong.onlineMetadata?.coverUrl;
 
-        if ((needsLyricsMatch || needsCoverMatch) && shouldRunLocalSongAutomaticMatch(localSong)) {
+        // 标记为纯音乐的歌 matchLyrics 整个不做（封面也是），这里就别提示「正在匹配歌词和封面」。
+        if (!localSong.markedPureMusic && (needsLyricsMatch || needsCoverMatch) && shouldRunLocalSongAutomaticMatch(localSong)) {
             setStatusMsg({ type: 'info', text: t('status.matchingLyricsAndCover') || '' });
             try {
                 const { matchLyrics } = await import('../services/localMusicService');
                 await matchLyrics(localSong);
-                const updatedSongs = await getLocalSongs();
-                const found = updatedSongs.find(song => song.id === localSong.id);
-
-                if (found) {
-                    updatedLocalSong = found;
-                }
             } catch (error) {
                 console.warn('Auto-match failed:', error);
             }
-            await loadLocalSongs();
+            // 只把这一首的最新记录换进 localSongs。以前这里整表 loadLocalSongs，换掉了预热正在写的那批对象，
+            // 预热结果因此到不了下一次切歌；整表替换还会让依赖 localSongs 的曲库视图跟着全量重算。
+            const found = await getLocalSong(localSong.id);
+            if (found) {
+                updatedLocalSong = found;
+                patchLocalSongsInState([found]);
+            }
         }
 
         return { updatedLocalSong, matchedSongResult };
-    }, [loadLocalSongs, setStatusMsg]);
+    }, [patchLocalSongsInState, setStatusMsg]);
 
     const resolveLocalMetadataUI = useCallback(async (localData: LocalSong, matchedSong: SongResult | null) => {
-        const embeddedCoverUrl = getOrCreateLocalCoverObjectUrl(localData);
+        const localCoverUrl = getLocalCoverAssetUrl(localData.localCoverAssetId, 1024);
         const preferOnlineCover = localData.useOnlineCover === true;
         const coverUrl = preferOnlineCover
-            ? (localData.onlineMetadata?.coverUrl || embeddedCoverUrl || null)
-            : embeddedCoverUrl;
+            ? (localData.onlineMetadata?.coverUrl || localCoverUrl || null)
+            : localCoverUrl;
 
-        let nextLyrics: LyricData | null = null;
-        const source = localData.lyricsSource;
-        if (source === 'online' && localData.matchedLyrics) {
-            nextLyrics = localData.matchedLyrics;
-        } else if (source === 'embedded' && localData.embeddedLyricsContent) {
-            nextLyrics = await LyricParserFactory.parse({ type: 'embedded', textContent: localData.embeddedLyricsContent, translationContent: localData.embeddedTranslationLyricsContent });
-        } else if (source === 'local' && localData.localLyricsContent) {
-            nextLyrics = await parseLocalSongLyrics(localData);
-        } else if (!source) {
-            const onlineFirst = useSettingsUiStore.getState().localLyricsPriority === 'online';
-            if (onlineFirst && localData.matchedLyrics) {
-                nextLyrics = localData.matchedLyrics;
-            } else if (localData.hasLocalLyrics && localData.localLyricsContent) {
-                nextLyrics = await parseLocalSongLyrics(localData);
-            } else if (localData.hasEmbeddedLyrics && localData.embeddedLyricsContent) {
-                nextLyrics = await LyricParserFactory.parse({ type: 'embedded', textContent: localData.embeddedLyricsContent, translationContent: localData.embeddedTranslationLyricsContent });
-            } else if (localData.matchedLyrics) {
-                nextLyrics = localData.matchedLyrics;
-            }
-        }
+        const resolvedLyrics = await resolveLocalSongLyrics(
+            localData,
+            useLyricSettingsStore.getState().localLyricsPriority,
+        );
 
         const catalog = await getLocalLibraryCatalogSnapshot();
         const unifiedSong = applyLocalLibraryEntityDisplay(buildUnifiedLocalSong({
@@ -480,8 +460,8 @@ export function useLibraryPlaybackController({
             preferOnlineMetadata: false,
         }), catalog);
 
-        return { lyrics: nextLyrics, coverUrl, unifiedSong, catalog };
-    }, [getOrCreateLocalCoverObjectUrl]);
+        return { lyrics: resolvedLyrics.lyrics, lyricsSource: resolvedLyrics.source, coverUrl, unifiedSong, catalog };
+    }, []);
 
     const loadCurrentSongLyricPreview = useCallback(async (): Promise<LyricData | null> => {
         if (!currentSong) {
@@ -491,32 +471,11 @@ export function useLibraryPlaybackController({
         if (isLocalPlaybackSong(currentSong)) {
             const localData = resolveLocalSongRecord(currentSong);
             if (!localData) return lyrics;
-            const source = localData.lyricsSource;
-
-            if (source === 'online' && localData.matchedLyrics) return localData.matchedLyrics;
-            if (source === 'embedded' && localData.embeddedLyricsContent) {
-                return LyricParserFactory.parse({ type: 'embedded', textContent: localData.embeddedLyricsContent, translationContent: localData.embeddedTranslationLyricsContent });
-            }
-            if (source === 'local' && localData.localLyricsContent) {
-                return parseLocalSongLyrics(localData);
-            }
-            if (!source) {
-                const onlineFirst = useSettingsUiStore.getState().localLyricsPriority === 'online';
-                if (onlineFirst && localData.matchedLyrics) {
-                    return localData.matchedLyrics;
-                }
-                if (localData.hasLocalLyrics && localData.localLyricsContent) {
-                    return parseLocalSongLyrics(localData);
-                }
-                if (localData.hasEmbeddedLyrics && localData.embeddedLyricsContent) {
-                    return LyricParserFactory.parse({ type: 'embedded', textContent: localData.embeddedLyricsContent, translationContent: localData.embeddedTranslationLyricsContent });
-                }
-                if (localData.matchedLyrics) {
-                    return localData.matchedLyrics;
-                }
-            }
-
-            return lyrics;
+            const resolved = await resolveLocalSongLyrics(
+                localData,
+                useLyricSettingsStore.getState().localLyricsPriority,
+            );
+            return resolved.source ? resolved.lyrics : lyrics;
         }
 
         if (isNavidromePlaybackSong(currentSong)) {
@@ -546,7 +505,7 @@ export function useLibraryPlaybackController({
     }, [currentSong, lyrics, resolveLocalSongRecord, resolveOnlineSongLyricsState]);
 
     const handleLocalQueueAdd = useCallback(async (localSong: LocalSong) => {
-        const preparedLocalSong = await ensureLocalSongEmbeddedCover(localSong);
+        const preparedLocalSong = await ensureLocalSongCoverAsset(localSong);
         const { unifiedSong } = await resolveLocalMetadataUI(preparedLocalSong, null);
         const baseQueue = playQueue.length > 0 ? playQueue : (currentSong ? [currentSong] : []);
         const { nextQueue, affectedSongs, changed } = applyQueueAddBehavior({
@@ -570,25 +529,29 @@ export function useLibraryPlaybackController({
         });
     }, [currentSong, persistLastPlaybackCache, playQueue, queueAddBehavior, resolveLocalMetadataUI, setPlayQueue, setStatusMsg, t]);
 
-    const prewarmLocalSongMetadata = useCallback(async (localSong: LocalSong) => {
-        const preparedLocalSong = await ensureLocalSongEmbeddedCover(localSong);
+    // 预热一首本地歌曲的封面与在线匹配；可能写过库（提取了封面或跑过匹配）时返回 true，供调用方回写到 localSongs。
+    const prewarmLocalSongMetadata = useCallback(async (localSong: LocalSong): Promise<boolean> => {
+        const preparedLocalSong = await ensureLocalSongCoverAsset(localSong);
+        const coverExtracted = preparedLocalSong !== localSong;
         Object.assign(localSong, preparedLocalSong);
 
-        const onlineFirst = useSettingsUiStore.getState().localLyricsPriority === 'online';
+        const onlineFirst = useLyricSettingsStore.getState().localLyricsPriority === 'online';
         const needsLyricsMatch = (
             (onlineFirst || (!localSong.hasLocalLyrics && !localSong.hasEmbeddedLyrics))
             && (!localSong.matchedLyrics && !localSong.matchedIsPureMusic
                 || shouldRefreshLocalSongLyricsFromMetadata(localSong))
         );
-        const needsCoverMatch = !isBlob(localSong.embeddedCover) && !localSong.onlineMetadata?.coverUrl;
-        if ((needsLyricsMatch || needsCoverMatch) && shouldRunLocalSongAutomaticMatch(localSong)) {
+        const needsCoverMatch = !hasLocalSongCover(localSong) && !localSong.onlineMetadata?.coverUrl;
+        if (!localSong.markedPureMusic && (needsLyricsMatch || needsCoverMatch) && shouldRunLocalSongAutomaticMatch(localSong)) {
             try {
                 const { matchLyrics } = await import('../services/localMusicService');
                 await matchLyrics(localSong);
             } catch (error) {
                 console.warn('[LocalPrewarm] Failed to prewarm local song metadata:', error);
             }
+            return true;
         }
+        return coverExtracted;
     }, []);
 
     const prewarmNearbyLocalSongs = useCallback((currentLocalSong: LocalSong, queue: LocalSong[] = []) => {
@@ -611,36 +574,58 @@ export function useLibraryPlaybackController({
 
         window.setTimeout(() => {
             void (async () => {
+                const touchedSongIds: string[] = [];
                 for (const nearbySong of nearbySongs) {
-                    await prewarmLocalSongMetadata(nearbySong);
+                    if (await prewarmLocalSongMetadata(nearbySong)) touchedSongIds.push(nearbySong.id);
                 }
+                // 预热结果必须回到 localSongs：队列与预热都从这里取记录，拿到旧快照就会重新提取封面、重新联网匹配。
+                // 等三首都做完才回写，此时才从库里读：每首做完就读的话，等后面几首联网匹配的这几秒里，
+                // 用户的改动或切到这首后的匹配写回会被这份更早的读覆盖回去。攒齐一次性回写，曲库视图只重算一次。
+                const records = await Promise.all(touchedSongIds.map(songId => getLocalSong(songId)));
+                patchLocalSongsInState(records.filter((record): record is LocalSong => Boolean(record)));
             })();
         }, 1000);
-    }, [prewarmLocalSongMetadata]);
+    }, [patchLocalSongsInState, prewarmLocalSongMetadata]);
 
-    const onPlayLocalSong = useCallback(async (localSong: LocalSong, queue: LocalSong[] = [], options: PlaybackNavigationOptions = {}) => {
+    const onPlayLocalSong = useCallback(async (localSong: LocalSong, queue: LocalSong[] = [], options: LibraryPlayOptions = {}) => {
+        const requestId = ++libraryPlayRequestIdRef.current;
         interruptStagePlaybackForMainTransition();
 
         const blobUrl = await getAudioFromLocalSong(localSong);
         if (!blobUrl) {
+            // 读文件期间用户换了歌：这次失败已不是用户眼前的事，不提示也不报告（见 LibraryPlayOptions.isCurrent）。
+            if (libraryPlayRequestIdRef.current !== requestId || options.isCurrent?.() === false) return;
             setStatusMsg({ type: 'error', text: t('status.localFileAccessError') || '' });
+            notifyPlaybackFailed({ song: toReportedLocalSong(localSong), reason: null, phase: 'play', willAutoSkip: false });
             return;
         }
 
-        const preparedLocalSong = await ensureLocalSongEmbeddedCover(localSong);
+        const preparedLocalSong = await ensureLocalSongCoverAsset(localSong);
         const initialMeta = await resolveLocalMetadataUI(preparedLocalSong, null);
+        const initialSongKey = getPlaybackSongKey(initialMeta.unifiedSong);
+        const recoveredRepresentation = getPlaybackRepresentationForRevision(
+            initialSongKey,
+            buildLocalSourceRevision(preparedLocalSong),
+        );
+        const playbackUrl = recoveredRepresentation?.url ?? blobUrl;
 
-        if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = blobUrl;
+        // Handed over, not revoked here: a blend is still playing the song this replaces on the
+        // other deck, and a revoked URL is a deck that can no longer be seeked. See `retireBlobUrl`.
+        retireBlobUrl(blobUrlRef.current);
+        blobUrlRef.current = recoveredRepresentation ? null : blobUrl;
+        if (recoveredRepresentation) {
+            retireBlobUrl(blobUrl);
+            retireBlobUrl(null);
+        }
 
         shouldAutoPlayRef.current = true;
-        const initialSongKey = getPlaybackSongKey(initialMeta.unifiedSong);
         currentSongRef.current = initialSongKey;
         setLyrics(initialMeta.lyrics);
+        setActiveLocalLyricsSource(initialMeta.lyricsSource);
         setCurrentLineIndex(-1);
         currentTime.set(0);
         setCurrentSong(initialMeta.unifiedSong);
-        setAudioSrc(blobUrl);
+        setAudioSrc(playbackUrl);
 
         if (initialMeta.coverUrl) {
             loadCachedOrFetchCover(`cover_local_${preparedLocalSong.id}`, initialMeta.coverUrl).then((resolvedCoverUrl) => {
@@ -663,10 +648,18 @@ export function useLibraryPlaybackController({
         void persistLastPlaybackCache(initialMeta.unifiedSong, finalQueue);
 
         if (options.shouldNavigateToPlayer ?? true) {
-            navigateToPlayer();
+            navigateToPlaybackView();
         }
         setPlayerState(PlayerState.IDLE);
-        setStatusMsg({ type: 'success', text: t('status.localMusicLoaded')});
+        if (shouldReportShiftedLyricFile(preparedLocalSong, initialMeta.lyricsSource)) {
+            setStatusMsg({
+                type: 'info',
+                text: t('status.lyricFileIssueShifted', { title: initialMeta.unifiedSong.name }),
+                durationMs: 8000,
+            });
+        } else {
+            setStatusMsg({ type: 'success', text: t('status.localMusicLoaded')});
+        }
         void restoreCachedThemeForSong(initialMeta.unifiedSong).catch((error) => {
             console.warn('Theme load error', error);
         });
@@ -682,6 +675,7 @@ export function useLibraryPlaybackController({
                 const updatedMeta = await resolveLocalMetadataUI(updatedLocalSong, matchedSongResult);
                 setCurrentSong(updatedMeta.unifiedSong);
                 setLyrics(updatedMeta.lyrics);
+                setActiveLocalLyricsSource(updatedMeta.lyricsSource);
                 setIsLyricsLoading(false);
 
                 if (updatedMeta.coverUrl && updatedMeta.coverUrl !== initialMeta.coverUrl) {
@@ -714,7 +708,7 @@ export function useLibraryPlaybackController({
         currentTime,
         handleLocalSongMatch,
         interruptStagePlaybackForMainTransition,
-        navigateToPlayer,
+        navigateToPlaybackView,
         persistLastPlaybackCache,
         prewarmNearbyLocalSongs,
         restoreCachedThemeForSong,
@@ -734,14 +728,16 @@ export function useLibraryPlaybackController({
     const onPlayNavidromeSong = useCallback(async (
         navidromeSong: NavidromeSong,
         queue: NavidromeSong[] = [],
-        options: PlaybackNavigationOptions = {},
+        options: LibraryPlayOptions = {},
     ) => {
+        const requestId = ++libraryPlayRequestIdRef.current;
         interruptStagePlaybackForMainTransition();
 
         const shouldNavigateToPlayer = options.shouldNavigateToPlayer ?? true;
         const config = getNavidromeConfig();
         if (!config) {
             setStatusMsg({ type: 'error', text: 'Navidrome not configured' });
+            notifyPlaybackFailed({ song: navidromeSong, reason: null, phase: 'play', willAutoSkip: false });
             return;
         }
 
@@ -787,12 +783,12 @@ export function useLibraryPlaybackController({
                     const navidromeMetadata = getProviderSongMetadata(navidromeSong);
                     const artistName = navidromeMetadata.artists.map(artist => artist.name).filter(Boolean).join(', ');
                     const albumName = navidromeMetadata.album?.name || '';
-                    const settings = useSettingsUiStore.getState();
+  const settingsLyricSettings = useLyricSettingsStore.getState();
 
-                    if (settings.autoUseBestLyric) {
+                    if (settingsLyricSettings.autoUseBestLyric) {
                         const bestMatch = await autoMatchBestLyric(navidromeSong.name, artistName, navidromeMetadata.durationMs, {
                             album: albumName,
-                            preferredSource: settings.preferredAlternativeLyricSource,
+                            preferredSource: settingsLyricSettings.preferredAlternativeLyricSource,
                         });
                         if (bestMatch?.isPureMusic) {
                             isAutoMatched = true;
@@ -909,15 +905,20 @@ export function useLibraryPlaybackController({
                 matchedLyricsSource: mutableSong.matchedLyricsSource || matchData?.matchedLyricsSource,
                 matchedLyricsProviderPlatform: mutableSong.matchedLyricsProviderPlatform || matchData?.matchedLyricsProviderPlatform,
             });
+            const unifiedSongKey = getPlaybackSongKey(unifiedSong);
+            const recoveredRepresentation = getPlaybackRepresentationForRevision(
+                unifiedSongKey,
+                buildNavidromeSourceRevision(unifiedSong, streamUrl),
+            );
 
             shouldAutoPlayRef.current = true;
-            currentSongRef.current = getPlaybackSongKey(unifiedSong);
+            currentSongRef.current = unifiedSongKey;
             setLyrics(nextLyrics);
             setCurrentLineIndex(-1);
             currentTime.set(0);
             setCurrentSong(unifiedSong);
             setManagedCachedCoverUrl(coverUrl ?? null);
-            setAudioSrc(streamUrl);
+            setAudioSrc(recoveredRepresentation?.url ?? streamUrl);
             setIsLyricsLoading(false);
 
             const finalQueue = options.unifiedQueue
@@ -929,7 +930,7 @@ export function useLibraryPlaybackController({
             void persistLastPlaybackCache(unifiedSong, finalQueue);
 
             if (shouldNavigateToPlayer) {
-                navigateToPlayer();
+                navigateToPlaybackView();
             }
             setPlayerState(PlayerState.IDLE);
             setStatusMsg({ type: 'success', text: t('status.navidromeSongLoaded')});
@@ -938,14 +939,18 @@ export function useLibraryPlaybackController({
             });
         } catch (error) {
             console.error('[App] Failed to play Navidrome song:', error);
-            setStatusMsg({ type: 'error', text: t('status.playbackFailed')});
             setIsLyricsLoading(false);
+            // 前面有好几次网络等待（匹配缓存、歌词、歌曲详情）：期间用户换了歌，这次失败就不提示也不报告（见 LibraryPlayOptions.isCurrent）。
+            if (libraryPlayRequestIdRef.current !== requestId || options.isCurrent?.() === false) return;
+            setStatusMsg({ type: 'error', text: t('status.playbackFailed')});
+            // 报告的是 Navidrome 载体本身（它就是 playSong 认得的 SongResult）：在这里重新构造统一歌曲可能因同一份残缺记录再抛错。
+            notifyPlaybackFailed({ song: navidromeSong, reason: null, phase: 'play', willAutoSkip: false });
         }
     }, [
         currentSongRef,
         currentTime,
         interruptStagePlaybackForMainTransition,
-        navigateToPlayer,
+        navigateToPlaybackView,
         persistLastPlaybackCache,
         restoreCachedThemeForSong,
         setAudioSrc,
@@ -968,34 +973,27 @@ export function useLibraryPlaybackController({
     const handleUpdateLocalLyrics = useCallback(async (content: string, isTranslation: boolean, fileName?: string) => {
         if (!isLocalPlaybackSong(currentSong)) return;
 
-        const localData = resolveLocalSongRecord(currentSong);
+        const localData = await resolveLatestLocalSongRecord(currentSong);
         if (!localData) return;
 
-        const updatedLocalSong = { ...localData };
-        if (isTranslation) {
-            updatedLocalSong.hasLocalTranslationLyrics = true;
-            updatedLocalSong.localTranslationLyricsContent = content;
-        } else {
-            updatedLocalSong.hasLocalLyrics = true;
-            updatedLocalSong.localLyricsContent = content;
-            updatedLocalSong.localLyricsFormat = resolveExplicitFileTimedLyricFormat(fileName);
-        }
+        const updatedLocalSong = applyUploadedLocalLyrics(localData, { content, isTranslation, fileName });
 
         try {
             const { saveLocalSong } = await import('../services/db');
             await saveLocalSong(updatedLocalSong);
+            await loadLocalSongs();
             void onPlayLocalSong(updatedLocalSong, localSongs, { unifiedQueue: playQueue });
             setStatusMsg({ type: 'success', text: isTranslation ? 'Translation lyrics updated' : 'Lyrics updated' });
         } catch (error) {
             console.error('Failed to save local lyrics', error);
             setStatusMsg({ type: 'error', text: 'Failed to save lyrics' });
         }
-    }, [currentSong, localSongs, onPlayLocalSong, playQueue, resolveLocalSongRecord, setStatusMsg]);
+    }, [currentSong, loadLocalSongs, localSongs, onPlayLocalSong, playQueue, resolveLatestLocalSongRecord, setStatusMsg]);
 
     const handleChangeLyricsSource = useCallback(async (source: 'local' | 'embedded' | 'online') => {
         if (!isLocalPlaybackSong(currentSong)) return;
 
-        const localData = resolveLocalSongRecord(currentSong);
+        const localData = await resolveLatestLocalSongRecord(currentSong);
         if (!localData) return;
 
         const updatedLocalSong = { ...localData, lyricsSource: source };
@@ -1003,20 +1001,19 @@ export function useLibraryPlaybackController({
             const { saveLocalSong } = await import('../services/db');
             await saveLocalSong(updatedLocalSong);
 
-            let nextLyrics: LyricData | null = null;
-            if (source === 'local' && updatedLocalSong.localLyricsContent) {
-                nextLyrics = await parseLocalSongLyrics(updatedLocalSong);
-            } else if (source === 'embedded' && updatedLocalSong.embeddedLyricsContent) {
-                nextLyrics = await LyricParserFactory.parse({ type: 'embedded', textContent: updatedLocalSong.embeddedLyricsContent, translationContent: updatedLocalSong.embeddedTranslationLyricsContent });
-            } else if (source === 'online' && updatedLocalSong.matchedLyrics) {
-                nextLyrics = updatedLocalSong.matchedLyrics;
-            }
+            const resolvedLyrics = await resolveLocalSongLyrics(
+                updatedLocalSong,
+                useLyricSettingsStore.getState().localLyricsPriority,
+            );
 
-            setLyrics(nextLyrics);
+            setLyrics(resolvedLyrics.lyrics);
+            setActiveLocalLyricsSource(resolvedLyrics.source);
             setCurrentLineIndex(-1);
             setCurrentSong(prev => {
                 if (!prev || !isSamePlaybackSong(prev, currentSong)) return prev;
-                return { ...prev };
+                // 显式来源下 isPureMusic 只在选 online 时取在线判定（与 buildUnifiedLocalSong 一致），
+                // 否则之后一次无关的 onRefreshLocalSongs 会把它当成纯音乐标记的切换。
+                return { ...prev, isPureMusic: source === 'online' ? Boolean(updatedLocalSong.matchedIsPureMusic) : false };
             });
             await loadLocalSongs();
             setStatusMsg({ type: 'success', text: t('status.lyricsSourceSwitched')});
@@ -1024,7 +1021,7 @@ export function useLibraryPlaybackController({
             console.error('Failed to save lyrics source', error);
             setStatusMsg({ type: 'error', text: 'Failed to save lyrics source' });
         }
-    }, [currentSong, loadLocalSongs, resolveLocalSongRecord, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
+    }, [currentSong, loadLocalSongs, resolveLatestLocalSongRecord, setCurrentLineIndex, setCurrentSong, setLyrics, setStatusMsg]);
 
     const handleManualMatchOnline = useCallback(() => {
         setIsPanelOpen(false);
@@ -1058,6 +1055,31 @@ export function useLibraryPlaybackController({
             setStatusMsg({ type: 'success', text: t('status.matchSuccessful') || 'Match successful' });
         }
     }, [currentSong, loadLocalSongs, localSongs, onPlayLocalSong, playQueue, setStatusMsg]);
+
+    // 播放页的匹配窗口里切换了纯音乐标记：关窗、刷新记录与当前歌词（onRefreshLocalSongs 就地换），不重新播放。
+    const handleLyricMatchPureMusicMarkChanged = useCallback(async (marked: boolean) => {
+        setShowLyricMatchModal(false);
+        await onRefreshLocalSongs();
+        setStatusMsg({ type: 'success', text: t(marked ? 'status.markedPureMusic' : 'status.unmarkedPureMusic') });
+    }, [onRefreshLocalSongs, setStatusMsg]);
+
+    // 命令面板：切换当前本地歌曲的纯音乐标记。
+    const handleToggleCurrentSongPureMusicMark = useCallback(async (): Promise<boolean> => {
+        if (!isLocalPlaybackSong(currentSong)) return false;
+        const localData = await resolveLatestLocalSongRecord(currentSong);
+        if (!localData) return false;
+        const marked = !localData.markedPureMusic;
+        try {
+            await setLocalSongPureMusicMark(localData.id, marked);
+            await onRefreshLocalSongs();
+            setStatusMsg({ type: 'success', text: t(marked ? 'status.markedPureMusic' : 'status.unmarkedPureMusic') });
+            return true;
+        } catch (error) {
+            console.error('Failed to toggle the instrumental mark', error);
+            setStatusMsg({ type: 'error', text: t('localMusic.pureMusicMarkFailed') });
+            return false;
+        }
+    }, [currentSong, onRefreshLocalSongs, resolveLatestLocalSongRecord, setStatusMsg]);
 
     const handleNaviLyricMatchComplete = useCallback(async () => {
         setShowNaviLyricMatchModal(false);
@@ -1223,6 +1245,7 @@ export function useLibraryPlaybackController({
                     }
 
                     setLyrics(resolvedUi.lyrics);
+                    setActiveLocalLyricsSource(resolvedUi.lyricsSource);
                 }
             }
         }
@@ -1239,12 +1262,13 @@ export function useLibraryPlaybackController({
             return false;
         }
 
-        const settings = useSettingsUiStore.getState();
+  const settingsLyricSettings = useLyricSettingsStore.getState();
         setStatusMsg({ type: 'info', text: t('status.matchingBestLyrics') || '' });
 
         try {
             if (isLocalPlaybackSong(currentSong)) {
-                const localData = resolveLocalSongRecord(currentSong);
+                // 读库里的最新记录：下面整条写回，不能带着 localSongs 里过期的字段（例如刚打的纯音乐标记）。
+                const localData = await resolveLatestLocalSongRecord(currentSong);
                 if (!localData) return false;
                 const catalog = await getLocalLibraryCatalogSnapshot();
                 const resolvedMetadata = resolveLocalSongMetadata(localData.id, catalog);
@@ -1254,7 +1278,7 @@ export function useLibraryPlaybackController({
                 });
                 const bestMatch = await autoMatchBestLyric(matchContext.title, matchContext.artist, matchContext.durationMs, {
                     album: matchContext.album,
-                    preferredSource: settings.preferredAlternativeLyricSource,
+                    preferredSource: settingsLyricSettings.preferredAlternativeLyricSource,
                     metadataCandidate: matchContext.metadataCandidate,
                 });
 
@@ -1274,16 +1298,21 @@ export function useLibraryPlaybackController({
                     matchedLyricsSource: bestMatch.source,
                     matchedLyricsProviderPlatform: bestMatch.matchedLyricsProviderPlatform,
                     matchedIsPureMusic: false,
+                    // 用户主动要了最佳歌词，纯音乐标记随之取消。
+                    markedPureMusic: undefined,
                     lyricsSource: 'online',
                 };
                 await applyMatchedMetadata(localData.id, {}, {
                     lyricsOnly: true,
                     songPatch: updatedLocalSong,
                 });
-                const updatedSong = { ...currentSong };
+                // 快照的 isPureMusic 跟记录走（标记被清掉了），localSongs 也刷新，匹配窗口才不会还显示已标记。
+                const updatedSong = { ...currentSong, isPureMusic: false };
                 setCurrentSong(prev => isSamePlaybackSong(prev, currentSong) ? updatedSong : prev);
                 setLyrics(bestMatch.lyrics);
+                setActiveLocalLyricsSource('online');
                 setCurrentLineIndex(-1);
+                await loadLocalSongs();
                 await persistLastPlaybackCache(updatedSong, playQueue);
                 setStatusMsg({ type: 'success', text: t('status.bestLyricsMatched') || '' });
                 return true;
@@ -1300,7 +1329,7 @@ export function useLibraryPlaybackController({
                 const albumName = navidromeMetadata.album?.name || '';
                 const bestMatch = await autoMatchBestLyric(navidromeSong.name, artistName, navidromeMetadata.durationMs, {
                     album: albumName,
-                    preferredSource: settings.preferredAlternativeLyricSource,
+                    preferredSource: settingsLyricSettings.preferredAlternativeLyricSource,
                 });
 
                 if (!bestMatch) {
@@ -1349,7 +1378,7 @@ export function useLibraryPlaybackController({
             const ownLyricsResult = await omni.getLyrics(currentSong);
             const bestMatch = await autoMatchBestLyric(currentSong.name, artistName, currentSongMetadata.durationMs, {
                 album: albumName,
-                preferredSource: settings.preferredAlternativeLyricSource,
+                preferredSource: settingsLyricSettings.preferredAlternativeLyricSource,
                 providerCandidate: sourceRef.kind === 'online'
                     && (sourceRef.providerId === 'netease' || sourceRef.providerId === 'kugou')
                     ? { providerId: sourceRef.providerId as 'netease' | 'kugou', song: currentSong, lyricsResult: ownLyricsResult }
@@ -1393,8 +1422,10 @@ export function useLibraryPlaybackController({
         }
     }, [
         currentSong,
+        loadLocalSongs,
         persistLastPlaybackCache,
         playQueue,
+        resolveLatestLocalSongRecord,
         resolveLocalSongRecord,
         setCurrentLineIndex,
         setCurrentSong,
@@ -1469,6 +1500,14 @@ export function useLibraryPlaybackController({
             setStatusMsg({ type: 'error', text: t('status.likeFailed') });
             return;
         }
+        if (!omni.canLikeSong(currentSong)) {
+            setStatusMsg({
+                type: 'info',
+                text: t('status.providerLikeUnavailable')
+                    .replace('{{provider}}', omni.getProviderLabel(sourceRef.providerId)),
+            });
+            return;
+        }
         try {
             const nextLiked = await omni.toggleSongLike(currentSong, likedSongIds);
             if (sourceRef.providerId === 'netease') {
@@ -1498,7 +1537,10 @@ export function useLibraryPlaybackController({
         t,
     ]);
 
-    return {
+    // Wrapped so the callbacks this hook hands back keep one identity for the app's lifetime. They
+    // are all invoked from events or effects, and their churn was what kept every build*Model memo
+    // in App.tsx from ever holding - see useStableCallbacks.ts.
+    return useStableActionSurface({
         localSongs,
         localPlaylists,
         showLyricMatchModal,
@@ -1531,11 +1573,13 @@ export function useLibraryPlaybackController({
         handleChangeOnlineLyricsSource,
         handleMatchOnlineLyrics,
         handleLyricMatchComplete,
+        handleLyricMatchPureMusicMarkChanged,
+        handleToggleCurrentSongPureMusicMark,
         handleNaviLyricMatchComplete,
         handleOnlineLyricMatchComplete,
         handleClearOnlineLyricsState,
         handleHomeMatchSong,
         handleAutoMatchBestLyricForCurrentSong,
         handleLike,
-    };
+    });
 }

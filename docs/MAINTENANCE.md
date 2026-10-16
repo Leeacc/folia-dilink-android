@@ -1,0 +1,29 @@
+# DiLink branch maintenance
+
+## Baseline and patch boundaries
+
+`UPSTREAM.json` pins the exact official tag and commit. The migration joins upstream Git ancestry so later updates can use a normal three-way merge; it does not claim the Android fork is byte-identical to upstream. Android code lives in `android/`, the private local music service in `mobile/`, UI adapters in `src/platform`, `src/services/android`, `src/components/car` and the dedicated car hooks. Build/CSS compatibility is in `build/postcss-webview95.mjs` and `postcss.config.js`.
+
+Keep the original AGPL license, contributor files and NOTICE. Update package version, Android versionCode, UPSTREAM.json and release notes together. Do not replace the whole frontend on each future update. Do not remove @note comments; R10 source notes are archived verbatim before the baseline replacement.
+
+## Release contract
+
+1. Merge a pinned upstream tag on an update branch. Resolve conflicts while retaining native playback, stream URL handling, Android hooks and CSS compatibility.
+2. Audit new Electron/native dependencies separately. Android uses Node.js Mobile 18.20.4; successful desktop installation on Node 24 is not proof that a dependency works on Android.
+3. Run types/unit checks, the compiled Chromium 95 UI fixtures (all 14 visualizers), production settings at five pane sizes, then API 29/35 smoke tests. API 29's old WebView exercises the explanatory fallback, API 35 exercises playback. These emulators do not prove BYD firmware behavior.
+4. Verify real native stream playback, linear app gain, media volume keys, session callbacks, background progress and optional spectrum. The native output must remain a single MediaPlayer with one audio focus owner. Do not connect it to a second WebAudio output graph.
+5. Push a `v*-dilink.*` tag after CI passes. The tag workflow reruns validation and publishes the fixed-key signed release APK with SHA256, build commit and upstream provenance. Prereleases remain marked until real-car regression results are available.
+
+`FOLIA_ANDROID_KEYSTORE_B64` and `FOLIA_ANDROID_KEYSTORE_PASSWORD` are repository secrets. Alias `folia-dilink`, PKCS12. Keep an offline backup outside Git. Losing the key prevents seamless future upgrades. Test and release variants share this key but only the test variant enables Android debugging.
+
+## Upstream monitor
+
+`.github/workflows/upstream-sync.yml` checks weekly and on demand. It compares official releases, attempts a merge in `upstream/<tag>`, and creates a draft PR when clean. A merge conflict produces a deduplicated issue listing files. It never automatically merges or publishes upstream code and never activates newly imported upstream workflows. Review the PR and run car regression before a release. If GitHub disables automatic PR creation, the run reports that permission failure; do not claim the update was merged.
+
+## Current boundaries
+
+All 14 built-in visualizers and 6 background categories remain registered. Optional third-party desktop Folium mods can require Node/filesystem/FFmpeg or desktop windows; those are not Android-compatible merely because their JavaScript can be copied. Automix/AI stems, browser effects/equalizer and device selection are unavailable on the native Android path and must be presented honestly.
+
+The native spectrum uses Android Visualizer on Folia's nonzero session only. It is opt-in with Android RECORD_AUDIO permission; no microphone AudioRecord is created. Denial/unavailable OEM audio effect does not fail playback. Native events update MotionValues directly at 20 Hz and stop when hidden. General timed animation remains available without a spectrum.
+
+BYD support: retain the application-level integer `BYD_SUPPORT_SPLIT_ACTIVITY=1`, resizable activity and no fixed orientation. Insets protect controls. Transparent app system bars are a request, not authority over the OEM caption. Do not spoof another media package, guess protected Binder transactions or copy a proprietary OEM SDK. Home-card producer integration remains an open real-device issue.

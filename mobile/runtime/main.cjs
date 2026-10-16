@@ -39,10 +39,10 @@ const kugou = createKugouApiBridge({
   } }),
 });
 
-async function dispatch(provider, endpoint) {
+async function dispatch(provider, endpoint, method = 'GET', payload = '') {
   if (provider === 'qq') {
-    if (!/^\/(login\/|logout(?:\?|$)|user\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
-    return requestQq(endpoint, stateDir, server.address().port, secret);
+    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
+    return requestQq(endpoint, stateDir, server.address().port, secret, method, payload);
   }
   const url = new URL(endpoint, 'http://localhost');
   const operation = url.pathname.slice(1).replace(/\//g, '_');
@@ -77,8 +77,8 @@ const server = http.createServer(async (req, res) => {
   try {
     let raw = '';
     for await (const chunk of req) { raw += chunk; if (raw.length > 256000) throw new Error('Request too large'); }
-    const { provider, endpoint } = JSON.parse(raw);
-    res.end(JSON.stringify({ data: await dispatch(provider, endpoint) }));
+    const { provider, endpoint, method, payload } = JSON.parse(raw);
+    res.end(JSON.stringify({ data: await dispatch(provider, endpoint, method, payload) }));
   } catch (error) {
     // Keep upstream cookies, URLs and credentials out of logs and client diagnostics.
     const body = error && typeof error.body === 'object' ? error.body : null;

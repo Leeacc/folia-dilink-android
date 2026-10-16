@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import * as LucideIcons from 'lucide-react';
 import type { Theme } from '../../../types';
 import { colorWithAlpha } from '../colorMix';
+import { useLucideIcons } from '../../../hooks/useLucideIcons';
+import { getLucideIconStatus, resolveLucideIcon } from '../../../services/lucideIconResolver';
 
 // src/components/visualizer/monet/MonetFloatingDecor.tsx
 // Renders gentle floating decorative particles for the Monet visualizer.
@@ -69,6 +70,7 @@ const MonetFloatingDecor: React.FC<MonetFloatingDecorProps> = ({
     staticMode = false,
 }) => {
     const availableIcons = theme.lyricsIcons ?? [];
+    useLucideIcons(availableIcons);
 
     const particles = useMemo(
         () => buildParticles(availableIcons),
@@ -80,13 +82,11 @@ const MonetFloatingDecor: React.FC<MonetFloatingDecorProps> = ({
 
     /** Resolves the visual element for a single particle. */
     const renderParticleContent = (p: FloatingParticle) => {
-        if (p.iconName) {
-            const Icon = LucideIcons[p.iconName as keyof typeof LucideIcons] as
-                | LucideIcons.LucideIcon
-                | undefined;
-            if (Icon) {
-                return <Icon size={p.size} strokeWidth={1} absoluteStrokeWidth color={theme.secondaryColor} />;
-            }
+        // Hold the spot while the icon's chunk loads rather than flashing a petal first.
+        if (p.iconName && getLucideIconStatus(p.iconName) === 'loading') return null;
+        const Icon = resolveLucideIcon(p.iconName);
+        if (Icon) {
+            return <Icon size={p.size} strokeWidth={1} absoluteStrokeWidth color={theme.secondaryColor} />;
         }
         return <SakuraPetal size={p.size} color={petalColor} />;
     };

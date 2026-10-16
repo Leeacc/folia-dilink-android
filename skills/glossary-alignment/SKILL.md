@@ -1,311 +1,161 @@
 ---
 name: glossary-alignment
-description: Use when the user refers to repository-specific terms such as home view, panel, local library, Navidrome view, visualizer mode, queue, current song, search state, or other spoken component/state names and you need to map them quickly to the concrete files, hooks, stores, and code ownership in this project.
+description: Use when the user refers to repository-specific spoken terms - home view, grid, player panel, local library, online provider, Stage, OBS, visualizer mode, queue, current song, search state, library suite and bravais wall terms (seam, spine, focus card, see-through windows) - and you need to turn that term into a name you can look up. Maps Chinese/English spoken terms to symbol or module names, not paths.
 ---
 
 # Glossary Alignment
 
-这个 skill 用于把口头术语快速映射到代码。
-
-目标：
-
-- 当开发者说“首页”“右侧面板”“本地库状态”“当前歌曲”“搜索状态”“心象模式”时，快速知道应该去看哪里
-- 避免因为术语不统一，改错组件、状态层或 service
-
-## When To Use
-
-以下情况优先使用：
-
-- 用户用自然语言描述界面或状态，而不是直接给文件名
-- 需要快速定位“这个词在代码里归谁管”
-- 需要判断某个名词属于组件、hook、store、service 还是共享类型
-- 需要在多人交流时对齐术语
-
-## Primary Mapping
-
-### App / Global
-
-- “主入口”“播放器主调度”“全局状态中心”
-  -> `src/App.tsx`
-
-- “当前歌曲”
-  -> `currentSong` in `src/App.tsx`
-
-- “播放队列”
-  -> `playQueue` in `src/App.tsx`
-
-- “状态提示”“顶部消息条”“toast 状态”
-  -> `statusMsg` in `src/App.tsx`
-
-### Navigation / View
-
-- “首页视图”“当前首页 tab”“主页 tab”
-  -> `homeViewTab` in `src/stores/useSearchNavigationStore.ts`
-  -> consumed by `src/components/Grid3D.tsx` and `src/components/app/home/GridViewOverlayHost.tsx`
-
-- “网格首页”“3D 首页”“集合网格”
-  -> `src/components/Grid3D.tsx` / `src/components/GridView.tsx`
-  -> collection adapters: `src/components/app/home/gridViewCollectionAdapters.ts`
-  -> overlay host: `src/components/app/home/GridViewOverlayHost.tsx`
-
-- “隐藏歌单”“歌单隐藏过滤”
-  -> `isPlaylistHidden` / `hiddenPlaylistKeys` in `src/components/Grid3D.tsx`, `src/components/GridMap.tsx`, `src/components/folia-grid/DesktopGrid3DSurface.tsx`
-
-- “文件夹排序”“本地排序策略”
-  -> `localFolderSortStrategy` in `src/components/GridView.tsx`
-
-- “当前 app 视图”“home/player 切换”
-  -> `useAppNavigation` in `src/hooks/useAppNavigation.ts`
-  -> persisted by `last_app_view`
-
-- “本地库导航状态”
-  -> `localMusicState` in `src/hooks/useAppNavigation.ts`
-  -> passed through `App.tsx` to `Home.tsx` and `LocalMusicView.tsx`
-
-- “Navidrome 待处理跳转”“待打开的 Navi 选择”
-  -> `pendingNavidromeSelection` in `src/hooks/useAppNavigation.ts`
-
-### Home / Library
-
-- “首页”
-  -> app-level entry: `src/components/app/Home.tsx`
-  -> mounts `GridViewOverlayHost` and `Grid3D` directly; legacy carousel and single-view home components are fully removed.
-
-- “首页模型”“Home 装配输入”
-  -> `src/components/app/home/buildHomeModel.ts`
-
-- “本地音乐页”“本地视图”
-  -> `src/components/LocalMusicView.tsx`
-
-- “本地文件夹/本地歌单详情页”
-  -> `src/components/local/LocalPlaylistView.tsx`
-
-- “Navidrome 页面”“Navi 页面”“Navi视图”
-  -> `src/components/navidrome/NavidromeMusicView.tsx`
-
-- “Navidrome 专辑页”
-  -> `src/components/navidrome/NavidromeAlbumView.tsx`
-
-- “网易云歌单页 / 专辑页 / 歌手页 / 详情集合”
-  -> 统一由 `GridView.tsx` 集合导航栈与 `src/components/app/home/gridViewCollectionAdapters.ts` 接管
-
-### Search
-
-- “搜索词”
-  -> `searchQuery` in `src/stores/useSearchNavigationStore.ts`
-
-- “搜索结果”
-  -> `searchResults` in `src/stores/useSearchNavigationStore.ts`
-
-- “搜索来源 tab”
-  -> `searchSourceTab` in `src/stores/useSearchNavigationStore.ts`
-
-- “搜索结果页面”“搜索工作台”
-  -> `src/components/app/search/SearchWorkspace.tsx`
-  -> overlay assembly: `src/components/app/overlays/AppOverlays.tsx`
-
-### Panel / Modal
-
-- “右侧面板”“播放器面板”“unified panel”
-  -> app-level entry: `src/components/app/PlayerPanel.tsx`
-  -> legacy implementation: `src/components/UnifiedPanel.tsx`
-
-- “面板模型”“PlayerPanel 装配输入”
-  -> `src/components/app/player-panel/buildPlayerPanelModel.ts`
-
-- “overlay 总装配”
-  -> `src/components/app/overlays/AppOverlays.tsx`
-  -> model builder: `src/components/app/overlays/buildAppOverlaysModel.ts`
-
-- “dialog 总装配”
-  -> `src/components/app/dialogs/AppDialogs.tsx`
-  -> model builder: `src/components/app/dialogs/buildAppDialogsModel.ts`
-
-- “封面 tab”
-  -> `src/components/panelTab/CoverTab.tsx`
-
-- “控制 tab”
-  -> `src/components/panelTab/ControlsTab.tsx`
-
-- “队列 tab”“播放列表 tab”
-  -> `src/components/panelTab/QueueTab.tsx`
-
-- “账号 tab”
-  -> `src/components/panelTab/AccountTab.tsx`
-
-- “本地 tab”
-  -> `src/components/panelTab/LocalTab.tsx`
-
-- “Navi tab”
-  -> `src/components/panelTab/NaviTab.tsx`
-
-- “FM tab”
-  -> `src/components/panelTab/FmTab.tsx`
-
-- “帮助弹窗”“设置弹窗”“选项中心”
-  -> `src/components/modal/SettingsModal.tsx`
-  -> settings subviews: `src/components/modal/settings/*`
-
-- “命令面板”“command palette”“快捷命令”
-  -> `src/components/command-palette/commandRegistry.ts`
-  -> context type: `src/components/command-palette/types.ts`
-
-- “外观设置”“视觉设置”“视觉配置导入导出”
-  -> `src/components/modal/settings/AppearanceSettingsSubview.tsx`
-  -> settings store: `src/stores/useSettingsUiStore.ts`
-
-- “播放设置”“集成设置”“存储设置”“桌面端设置”“实验室设置”
-  -> `src/components/modal/settings/PlaybackSettingsSubview.tsx`
-  -> `src/components/modal/settings/IntegrationSettingsSubview.tsx`
-  -> `src/components/modal/settings/StorageSettingsSection.tsx`
-  -> `src/components/modal/settings/DesktopSettingsSubview.tsx`
-  -> `src/components/modal/settings/LabSettingsModal.tsx`
-
-- “本地歌词匹配弹窗”
-  -> `src/components/modal/LyricMatchModal.tsx`
-
-- “Navidrome 歌词匹配弹窗”
-  -> `src/components/modal/NaviLyricMatchModal.tsx`
-
-### Visualizer
-
-- “歌词可视化”“全屏歌词层”“visualizer”
-  -> `src/components/visualizer/*`
-
-- “经典模式”“classic”
-  -> `src/components/visualizer/classic/Visualizer.tsx`
-  -> `VisualizerMode = 'classic'`
-
-- “心象模式”“cadenza”
-  -> `src/components/visualizer/cadenza/VisualizerCadenza.tsx`
-  -> `VisualizerMode = 'cadenza'`
-
-- “云阶模式”“partita”
-  -> `src/components/visualizer/partita/VisualizerPartita.tsx`
-  -> `VisualizerMode = 'partita'`
-
-- “浮名模式”“fume”
-  -> `src/components/visualizer/fume/VisualizerFume.tsx`
-  -> `VisualizerMode = 'fume'`
-
-- “群唱模式”“cappella”
-  -> `src/components/visualizer/cappella/VisualizerCappella.tsx`
-  -> `VisualizerMode = 'cappella'`
-
-- “倾诉模式”“tilt”
-  -> `src/components/visualizer/tilt/VisualizerTilt.tsx`
-  -> `VisualizerMode = 'tilt'`
-
-- “莫奈模式”“monet”
-  -> `src/components/visualizer/monet/VisualizerMonet.tsx`
-  -> `VisualizerMode = 'monet'`
-
-- “回环模式”“claddagh”
-  -> `src/components/visualizer/claddagh/VisualizerCladdagh.tsx`
-  -> `VisualizerMode = 'claddagh'`
-  -> tuning: `claddaghTuning` in `src/stores/useSettingsUiStore.ts`
-
-- “漫游模式”“立影模式”“diorama”
-  -> `src/components/visualizer/diorama/VisualizerDiorama.tsx`
-  -> `VisualizerMode = 'diorama'`
-
-- “通用背景 / 莫奈背景 / 隐现双着色器背景”
-  -> `visualizerBackgroundMode` in `src/stores/useSettingsUiStore.ts`
-  -> shell background registry: `src/components/visualizer/backgrounds/registry.tsx`
-
-- “可视化模式状态”
-  -> `visualizerMode` in `src/stores/useSettingsUiStore.ts`
-  -> bridge hook: `src/hooks/useAppPreferences.ts`
-  -> related type in `src/types.ts`
-
-- “更新通道”“limo 通道”“cielo 通道”
-  -> `electron/updateChannels.cjs` / `electron/main.cjs`
-
-- “自定义字重”
-  -> `resolveThemeFontWeight` in `src/utils/fontStacks.ts` / `useSettingsUiStore.ts`
-
-- “Acrylic 确认弹窗”
-  -> `src/components/modal/settings/DesktopSettingsSubview.tsx`
-
-### Data / Service
-
-- “网易云接口层”
-  -> `src/services/netease.ts`
-
-- “酷狗接口层 / 酷狗 Provider”
-  -> `src/services/onlineMusic/kugouTransport.ts` / `kugouProvider.ts`
-
-- “Navidrome 接口层”
-  -> `src/services/navidromeService.ts`（已适配 Navidrome 0.63+ `/api/getLyrics` 歌词接口）
-
-- “本地导入逻辑”“本地文件扫描”“重扫逻辑”
-  -> `src/services/localMusicService.ts`
-
-- “在线播放加载”
-  -> `src/services/onlinePlayback.ts`
-
-- “播放结构适配”
-  -> `src/services/playbackAdapters.ts`
-
-- “缓存数据库”“IndexedDB 层”
-  -> `src/services/db.ts`
-  -> dedicated theme sync registry: `theme_registry` store via `src/services/sync/themeSyncRegistry.ts`
-
-- “预取”
-  -> `src/services/prefetchService.ts`
-
-- “同步服务”“云同步”“主题同步”
-  -> configuration/status: `src/services/sync/syncConfig.ts`
-  -> orchestration: `src/services/sync/syncCoordinator.ts`
-  -> local/remote repository: `src/services/sync/syncRepository.ts`
-  -> stable song fingerprints and local registry: `src/services/sync/syncFingerprint.ts` / `themeSyncRegistry.ts`
-  -> settings UI: `src/components/modal/settings/StorageSettingsSection.tsx`
-  -> command palette: `settings-r2-sync` / `sync-now` in `src/components/command-palette/commandRegistry.ts`
-
-### Types / Shared Definitions
-
-- “统一歌曲结构”
-  -> `SongResult` / `UnifiedSong` in `src/types.ts`
-
-- “本地歌曲结构”
-  -> `LocalSong` in `src/types.ts`
-
-- “Navidrome 类型”
-  -> `src/types/navidrome.ts`
-
-- “首页 tab 类型”
-  -> `HomeViewTab` in `src/types.ts`
-
-- “可视化模式类型”
-  -> `VisualizerMode` in `src/types.ts`
-
-## Fast Lookup Heuristics
-
-- 术语里带“页面”“视图”“弹窗”“tab”
-  -> 先看 `components/app/*` 是否已有 app-level 入口，再看 `components/*`
-
-- 术语里带“状态”“导航”“当前模式”“偏好”
-  -> 先看 `hooks/*` 或 `stores/*`
-
-- 术语里带“模型”“装配”“入口透传”“顶层派生”
-  -> 先看 `components/app/*/build*.ts` 或 `create*.ts`
-
-- 术语里带“接口”“缓存”“导入”“播放流程”
-  -> 先看 `services/*`
-
-- 术语里带“类型”“模式枚举”“共享结构”
-  -> 先看 `types.ts` 或 `types/navidrome.ts`
-
-## Workflow
-
-1. 先把口头术语归类为：组件 / 视图 / 状态 / store / service / type。
-2. 用上面的 glossary 找到第一归属文件。
-3. 再从该文件向上传导或向下调用追踪真实实现。
-4. 如果术语和代码命名不一致，以真实代码为准，并在回答中直接说明映射关系。
-
-## What To Avoid
-
-- 把“首页状态”误认为只在 `Home.tsx` 内部
-- 把“右侧面板”误认为单个 tab 文件
-- 把“可视化模式”误认为只是组件名，而忽略 `VisualizerMode` 和 `useAppPreferences`
-- 把“本地库状态”只看 `LocalMusicView.tsx`，忽略 `useAppNavigation.ts` 里的 `localMusicState`
+把口头术语换成**名字**，然后用 `ts-code-map` 的 `search` / `find_symbol` 解析成当前路径。
+
+这里刻意不写路径。文件会改名、会移动、会拆目录，路径表撑不住；符号名和模块名稳定得多，
+而且真过期时 `search` 会直接告诉你找不到，不会像旧路径那样把你引到一个不存在的地方。
+
+**用法**：查表拿到名字 → `search` 或 `find_symbol` 拿到当前位置 → 再往下读。
+
+## App / 全局状态
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 主入口 / 总装配 | `App`，区域边界看 `AppShell`、`Home`、`PlayerPanel`、`AppOverlays`、`AppDialogs` |
+| 当前歌曲 / 播放队列 / 状态提示 | `App` 里的 `currentSong` / `playQueue` / `statusMsg` |
+| home/player 切换 / 最后视图 | `useAppNavigation` |
+| 搜索词 / 搜索结果 / 搜索来源 tab / 首页 tab | `useSearchNavigationStore` |
+| 集合导航栈 / 当前集合 | `useCollectionNavigationStore` |
+| 设置弹窗当前页 | `useSettingsModalStore`（只管 UI 状态，不存设置值） |
+| 某一项具体设置的值 | 按领域找 `use*SettingsStore`：`useAudioSettingsStore`、`useLyricSettingsStore`、`useThemeSettingsStore`、`useTypographySettingsStore`、`useVisualizerSettingsStore`、`useDesktopSettingsStore`、`useInteractionSettingsStore` 等 |
+| 主题快速编辑器 | `useThemeQuickEditorStore` |
+
+## 首页 / 库
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 首页 / 网格首页 / 3D 首页 | `Home` → `buildHomeModel` / `useHomeModel` → `Grid3D` / `GridView` |
+| 集合卡片 / 网格导航 / 六边形 viewport | `folia-grid` 目录 |
+| 首页 collection adapter | `gridViewCollectionAdapters` |
+| 本地库首页面 / 本地 3D 网格 | `LocalGrid3DView`、`localGrid3DModel` |
+| Navidrome 首页面 | `NavidromeGrid3DView`、`useNavidromeGridLibrary` |
+| 本地库扫描 / 索引 / 重扫 | `useLocalLibraryCatalog` → `localLibraryCatalogService`、`localMusicService`、`localLibraryIndex` |
+| 本地文件夹 / 本地歌单 / 实体编辑 | `entityEditorModel`、`localPlaylistService` |
+| 在线 provider 账号 / 登录 | `useOnlineProviderAccountStore`、`useOnlineProvider*` hooks |
+
+## 资料库 suite / bravais 墙
+
+资料库（Library）按 headless core 与 UI suite 分开：grid（默认、回退）、bravais（正式新 UI，「一面墙 + 一道缝」）、tui（开发验证）。
+bravais 的口头说法大多来自它的设计稿（不在仓库里，常用的说法已收进下表）。
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 资料库界面 / UI suite / 换 suite | `useLibrarySuiteStore`（存的是选择）、`resolveActiveLibrarySuiteId` / `useActiveLibrarySuiteId`（生效的那套）、`chooseLibrarySuite` → `switchLibrarySuite`、设置节 `LibrarySuiteSection`；「是不是 bravais」用 `useIsBravaisLibraryActive` |
+| 初始选择 / 回退 suite | `LIBRARY_SUITE_INITIAL_CHOICE`（开发阶段 bravais）、`DEFAULT_LIBRARY_SUITE_ID`（grid） |
+| 舞台 / stage / 常驻墙 | `BravaisStage`；宿主侧 `LibrarySuiteStageSlot`、`resolveLibraryStage`、`LibrarySuiteStageProps` |
+| 层 / 层描述 | `BravaisLayer`，由 surface 经 `useBravaisLayerRegistration` 推进 `bravaisStageStore` |
+| 墙 / 磁贴 / 窗位以外的空画框 | `BravaisWall`、`BravaisTile`（种类 `BravaisTileKind`：content / wall / window） |
+| 共享 wall 引擎 / 墙面几何 | `wall` 目录：`wallSlots`、`rankSlots`、`finiteWall`、`seamPlan`、`flipPlan`、`startTile`、`blockReservedSlots`、`WallTitle` |
+| 块 / slot / rank（严格 rank） | `WallSlot`、`rankSlots`；12×8 块的模板 `blockTemplates` |
+| 有限墙 / 有限拼贴 / 退化（过滤中） | `planFiniteWall`、`planBravaisFinite`；层的 `mode: 'finite'` |
+| 无限墙 / 无限拼贴 / 循环偏移 | `getInfiniteSlotItem`、`getStartWrapOffset`；层的 `mode: 'infinite'` |
+| 翻牌 | `planFlip`、`diffDisplays`、`resolveTileTransition`；磁贴只转内容层 |
+| 起点磁贴 | `setBravaisPendingOrigin` / `takeBravaisPendingOrigin`、`recordPushOrigin`（`beforePush`）、`resolveStartSlotKey` |
+| 聚焦卡 / 块内让位 | `useBravaisFocus`、`BravaisFocusCardBody`、`layoutFocusedBlock`（`blockReflows`）、`revealRect` |
+| 缝 / 裂缝 | `BravaisSeam`、`useBravaisSeam`、`BravaisSeamContent`；开口目标 `resolveSeamTarget` / `resolveStageSeamTarget` |
+| 信息条 / 书脊 / 折叠（缝的开口等级） | `BravaisSeamLevel` 的 `full` / `spine` / `hidden`，全局 store `useBravaisSeamStore`；外观动作 `bravais-seam-full` / `-seam-spine` / `-seam-hide` |
+| 首页窄缝 / 缝里的搜索框 | `BravaisSeamHome`、`BravaisSeamSearch` |
+| 缝只开在块边界 / 相机让位 / 边缘收起、就地重开 | `blockSeamPlan`、`getSeamGeometry`、`getSeamSplitOffsets`；外观动作 `bravais-seam-here` |
+| 播放条安全区 | `useBravaisPlayerSafeArea` |
+| 面板（列表面板 / 目录树面板） | `BravaisListPanel`、`BravaisDirectoryPanel`（`useBravaisDirectoryPanel`、`BravaisHomeDirectory`）；面板 history `openBravaisPanel` / `bravaisPanelHistory`（记录标记 `bravaisPanel`） |
+| 批量模式 | 目录树面板开着时的首页本地层；core 侧 `useLibraryDirectorySelection` |
+| 管理隐藏视图 | `useLibraryDirectoryVisibility`（`browse` / `manage` / `manage-hidden-only`） |
+| 表单态（改名、删除确认、加入歌单） | `reduceBravaisForm`、`BravaisSeamFormView` |
+| 缝里的登录态 / 确认态 / 平台切换 | `BravaisAccount` → `bravaisAccountStore` → `BravaisSeamAccount`；平台切换 `BravaisSeamAccountSwitcher` |
+| 移除的两段翻牌 | `detectRemovedEntries`、`maskRemovedEntries` |
+| 整墙出场 / 入场（换页签、从搜索 / 播放页进出） | `planWallWave`、`BravaisEntrance`；换层种类 `resolveShiftKind`（push / back / replace / enter / exit） |
+| 降低动态效果（bravais） | `resolveBravaisReducedTransitions` |
+| 面包屑 / 跳层 | `BravaisSeamCrumbs`、`buildBravaisCrumbs`、`useBravaisPopTo`；契约 `onPopTo`、`trail`（`projectNavigationTrail`）；导航层 `popCollectionTo` |
+| 紧邻往返折叠（N1）/ 去环 | `resolveCollectionPush`（push / back / noop）、`popCollectionLayer`、`findLayerBaseIndex` |
+| 布局记忆 / 忘掉布局 | `readBravaisLayout` / `writeBravaisLayout`；manifest 的 `layout.forget` |
+| 外观动作 / suite-chrome | manifest 的 `chromeActions`、`useLibrarySuiteChromeRegistration`、`useBravaisChromeActions`；命令 `bravais-<id>` |
+| 透光 / 透光档位（实色 / 部分透明 / 全透明）/ 每块窗数 | `useLibraryWallLookStore`、`LibraryWallLook`、`LibraryWallLookSettings`、`useBravaisWallLook`；外观动作 `bravais-wall-look` |
+| 叠页边 / 集合叠页边（集合磁贴右下错开的页边） | `bravaisTileForm` 的 `stack`、`.bravais-tile-face.is-stack`、根节点 `has-stack-edges`；设置 `useLibraryWallLookStore.collectionStackEdges` |
+| Bravais 分组 / Bravais 墙面设置 | `BravaisSettingsSection`、锚点 `bravaisSettings`、命令 `settings-bravais` |
+| 窗 | 保留位 `blockReservedSlots`、`resolveReservedPerBlock`；磁贴种类 `window` |
+| 底板（按块 SVG） | `BravaisBlockPlates`、`useBravaisBlockPlates`、`bravaisBlockPlate`；让位逐帧重画 `useBravaisReflowPlate` |
+| 遮挡播放页 / 实色档卸载 visualizer | `reportPlayerOcclusion`、`useLibraryPlayerOcclusionStore`、`shouldMountPlayerVisualizer` |
+| 墙后的画面（透出的 visualizer 画不画歌词、模糊） | `reportPlayerBackdrop`、`selectLibraryPlayerBackdrop`、`playerVisualizerBackdrop` |
+| 信息条样式 / 透明信息条（缝的材质、预设） | `seamStyle`、`seamClear`、`libraryWallSeamStyle`、`bravaisSeamLooks.css` |
+| 队列墙 / Lattice | `Lattice`、`PosterWall`（独立的 app 视图，只和 bravais 共享 wall 引擎） |
+
+## 面板 / 搜索 / 弹窗
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 搜索工作台 / 搜索结果页 | `SearchWorkspace` |
+| 右侧播放器面板 / unified panel | 入口 `PlayerPanel` → `buildPlayerPanelModel`；旧实现仍在 `UnifiedPanel` |
+| 封面 / 控制 / 队列 tab 等 | `panelTab` 目录下的 `*Tab` |
+| overlay / dialog 总装配 | `AppOverlays` + `buildAppOverlaysModel`、`AppDialogs` + `buildAppDialogsModel` |
+| 设置弹窗 | `SettingsModal`；外观导入导出在 `AppearanceSettingsSubview` |
+| 命令面板 | `commandRegistry`、`CommandPalette`、`useCommandPaletteContext` |
+| 加入歌单 | `AddToPlaylistHost` |
+
+## 播放 / 外部界面
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 播放 transport / queue / audio bridge | `usePlaybackTransportController`、`usePlaybackQueueController`、`usePlaybackAudioBridge`、`usePlaybackVisualizerBridge` |
+| 在线播放 / 播放源适配 / 预取 | `onlinePlayback`、`playbackAdapters`、`prefetchService` |
+| Stage 模式 / 外部播放器控制 | `useStagePlaybackController`、`appStageHelpers`、`stagePlayerSnapshot` |
+| Now Playing / PlayerCap | `useNowPlayingSource`、`usePlayerCapSource`、`nowPlayingProvider`、`playerCapProvider` |
+| OBS 浏览器源 | `useObsBrowserSourcePublisher`、`obsBrowserSource` |
+| 远程控制 / 视频导出 | `useElectronVideoExportController`、`electronVideoExport` |
+
+## 在线音乐
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 在线歌曲的一切（搜索/歌词/音频/歌单/账户） | `omni` —— 这是公共边界，普通调用只经过它 |
+| 网易云 / 酷狗 provider | `neteaseProvider`、`kugouProvider`、`kugouTransport` —— 实现边界，UI/hook/store 不应直连 |
+| provider 注册 / 账号缓存 | `providerRegistry`、`providerAccountCache`、`providerStorage` |
+| Navidrome / Subsonic | `navidromeService` —— **不是** Omni provider |
+
+## 歌词 / Visualizer
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 歌词解析 / 原始格式 | `parserCore` 和 `src/workers` 下的 parser worker；visualizer 不负责解析 |
+| 短句 / render end / fast reveal | `renderHints` |
+| CJK 语义分组 / sticky 标点 | `cjkSemanticLayout` |
+| 逐字 / grapheme timing | `graphemeTiming` |
+| visualizer 统一入口 / 背景 | `VisualizerRenderer`、`VisualizerBackgroundRenderer` |
+| visualizer shared props / tuning | `tuningRegistry`，以及 visualizer 目录下的 `definition` |
+| 某个模式 | 模式目录下的 `entry.tsx`；模式清单直接看 `src/components/visualizer/` 下有哪些目录，别信写死的列表 |
+| 字体栈 / 颜色混合 | `fontStacks`、`colorMix` |
+
+## 持久化 / 同步 / 部署
+
+| 口头说法 | 名字 |
+| --- | --- |
+| 同步 / R2 / 主题 registry | `syncCoordinator`、`syncClient`、`syncRepository`、`settingsSnapshot`、`themeSyncRegistry` |
+| IndexedDB / 各类缓存 | `appDatabase`、`binaryAssetStore`、`coverCache`、`themeCache` |
+| Electron 主进程 / bridge | `electron/` 下的 `main.cjs`、`preload.cjs`、`stageApi.cjs`、`kugouApiBridge.cjs` |
+| Sync Server | `sync-server/src/` 下的 `app.ts`（路由/协议）、`node.ts`、`cloudflare.ts`、`d1-emulator.ts`；Worker 包装在 `worker/index.ts` |
+| Docker Web stack | `deploy/docker/` |
+
+## 名字对不上时的判断顺序
+
+1. 带“页面 / 视图 / 弹窗 / tab” → 先看 `components/app/*`，再看具体展示组件。
+2. 带“状态 / 导航 / 偏好 / 当前模式” → 先看 `hooks` 和 `stores`。
+3. 带“模型 / 装配 / 派生” → 找相邻的 `build*` / `create*`。
+4. 带“接口 / provider / 缓存 / 播放流程” → 先看 `services`；在线歌曲一律先看 `omni`。
+5. 带“类型 / 枚举 / 共享结构” → 先看 `types`。
+6. 以上都不中 → 直接 `search`，让它退回全文搜索。
+
+## 容易搞错的几个
+
+- 别把首页逻辑都归给 `Home`，`buildHomeModel`、collection adapters、导航 store 各有分工。
+- 别把“右侧面板”只理解成某个 tab，入口是 `PlayerPanel` + `buildPlayerPanelModel`。
+- 别把 Navidrome 当成 Omni provider，也别让普通在线调用绕开 `omni`。
+- 别以为 `App.tsx` 里有 visualizer 模式的 switch，registry 从 `entry.tsx` 自动发现。
+- 别把精确播放时间当 React state，连续值走 MotionValue / ref / canvas。
+- 别找“统一的设置 store”，它已经按领域拆开了。
+- 别把 bravais 的「面板」当成右侧播放器面板：前者是缝展开成的列表 / 目录树（`BravaisListPanel` / `BravaisDirectoryPanel`），后者是 `PlayerPanel`。
+- 别把 bravais 的「过滤」和「全局搜索」混为一谈：过滤是命令面板内联框（`useGridCommandFilter`，会话里的过滤词），全局搜索提交后去 `SearchWorkspace`，离开墙。
+- 别在 `useLibrarySuiteStore` 的原始值上判断「当前是哪套 suite」，它可能是本构建没有的 id；用 `resolveActiveLibrarySuiteId`。
