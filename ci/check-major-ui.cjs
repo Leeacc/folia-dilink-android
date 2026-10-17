@@ -4,7 +4,8 @@ const { chromium } = require(process.env.FOLIA_LEGACY_PLAYWRIGHT || '@playwright
 // The production build and synthetic upstream probes have different roles; neither substitutes for native audio checks.
 const modes = ['classic','cadenza','partita','fume','cappella','tilt','claddagh','monet','diorama','pendolo','lumiere','sonnet','still','tempera'];
 const out = process.env.FOLIA_UI_OUTPUT || 'artifacts/major-ui';
-const deadline = setTimeout(() => process.exit(1), 600000);
+// Software-rendered Chromium95 plus the full responsive suite needs a bounded 15-minute budget.
+const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded its 15-minute budget'); process.exit(1); }, 900000);
 (async () => {
     fs.mkdirSync(out, {recursive: true});
     fs.mkdirSync('artifacts/chromium95', {recursive: true});

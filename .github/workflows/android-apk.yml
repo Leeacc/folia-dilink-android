@@ -29,7 +29,7 @@ jobs:
   build:
     if: ${{ !inputs.apk_run_id }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
       FOLIA_ANDROID_VERSION_CODE: ${{ github.run_number }}
