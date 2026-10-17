@@ -43,7 +43,14 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
         for (const [width, height] of [[1920,1080],[960,720],[800,600],[412,732],[680,420]]) {
             await page.setViewportSize({width,height});
             console.log(`Checking car tools at ${width}x${height}`);
-            await page.waitForTimeout(350);
+            // On software-rendered old Chromium, a fixed delay can sample the initial 0.9 scale.
+            // Keep the real touch-size assertions; wait until the actual entrance has finished.
+            await page.waitForFunction(() => {
+                const element = document.querySelector('.lattice-tools-panel');
+                if (!element) return false;
+                const style = getComputedStyle(element), transform = new DOMMatrixReadOnly(style.transform);
+                return transform.a === 1 && transform.d === 1 && Number(style.opacity) === 1;
+            }, null, {timeout:15000});
             const geometry = await panel.evaluate(element => {
                 element.scrollTop = 0;
                 const bounds = element.getBoundingClientRect();
