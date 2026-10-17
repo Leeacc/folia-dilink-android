@@ -1,0 +1,14 @@
+/* Narrow car panes reserve the expanded capsule's 132px height plus a 12px gap.
+   A margin keeps the shared live bottom offset and Motion's entrance transform intact. */
+html[data-runtime="capacitor-android"] .now-playing-toast {
+    max-width: calc(100vw - 48px);
+}
+html[data-runtime="capacitor-android"] .now-playing-toast [data-toast-card] {
+    min-width: 0;
+    max-width: calc(100vw - 48px);
+}
+@media (max-width: 1200px) {
+    html[data-runtime="capacitor-android"] .now-playing-toast {
+        margin-bottom: 144px;
+    }
+}

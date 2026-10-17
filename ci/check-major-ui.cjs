@@ -4,7 +4,8 @@ const { chromium } = require(process.env.FOLIA_LEGACY_PLAYWRIGHT || '@playwright
 // The production build and synthetic upstream probes have different roles; neither substitutes for native audio checks.
 const modes = ['classic','cadenza','partita','fume','cappella','tilt','claddagh','monet','diorama','pendolo','lumiere','sonnet','still','tempera'];
 const out = process.env.FOLIA_UI_OUTPUT || 'artifacts/major-ui';
-const deadline = setTimeout(() => process.exit(1), 600000);
+// Software-rendered Chromium95 plus the full responsive suite needs a bounded 15-minute budget.
+const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded its 15-minute budget'); process.exit(1); }, 900000);
 (async () => {
     fs.mkdirSync(out, {recursive: true});
     fs.mkdirSync('artifacts/chromium95', {recursive: true});
@@ -13,6 +14,7 @@ const deadline = setTimeout(() => process.exit(1), 600000);
     if (process.env.FOLIA_REQUIRE_CHROMIUM95 && !report.browser.startsWith('95.')) throw new Error('Expected actual Chromium 95');
     const base = process.env.FOLIA_UI_BASE || 'http://127.0.0.1:4191';
     try {
+        await require('./check-car-toast.cjs')(browser, base);
         let page = await browser.newPage({viewport:{width:1280,height:720},locale:'en-US'});
         await page.addInitScript(() => {
             localStorage.setItem('folia_app_language','en');

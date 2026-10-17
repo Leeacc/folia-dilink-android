@@ -8,7 +8,7 @@
     "email": "chthollyphile@users.noreply.github.com"
   },
   "private": true,
-  "version": "0.7.20-dilink.2",
+  "version": "0.7.20-dilink.3",
   "license": "AGPL-3.0",
   "type": "module",
   "main": "electron/main.cjs",
@@ -291,7 +291,8 @@
     "@capacitor/assets": "3.0.5",
     "@capacitor/cli": "8.4.2",
     "postcss-preset-env": "11.6.1",
-    "@csstools/postcss-cascade-layers": "6.0.2"
+    "@csstools/postcss-cascade-layers": "6.0.2",
+    "sharp": "0.35.5"
   },
   "overrides": {
     "@babel/plugin-transform-runtime": "7.29.7",
