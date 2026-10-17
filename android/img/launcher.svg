@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="108" height="108" viewBox="0 0 108 108">
+  <!-- Folia's F/leaf mark, redrawn for a small car launcher and the adaptive safe zone. -->
+  <defs><linearGradient id="background" x2="1" y2="1"><stop stop-color="#172C46"/><stop offset="1" stop-color="#185D57"/></linearGradient></defs>
+  <path fill="url(#background)" d="M0 0h108v108H0z"/>
+  <path fill="#F5FFF9" d="M35 36q0-6 6-6h7v45q0 5-5 5h-3q-5 0-5-5z"/>
+  <path fill="#A5F3DC" d="M48 30h19c8 0 11 5 11 11s-5 7-11 7H48z"/>
+  <path fill="#D5F9EB" d="M48 55h14c6 0 9 4 9 9s-4 6-9 6H48z"/>
+</svg>

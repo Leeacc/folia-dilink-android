@@ -2,8 +2,9 @@ import { access, copyFile, mkdir, rm } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { generateCarLauncherIcons } from './generate-car-icon.mjs';
 
-// 当前文件：从 android/img 的三张源图重复生成 Android 图标和浅色/深色启动资源。
+// 当前文件：从 android/img 源图生成启动资源，再生成统一的车机安装图标。
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const sourceDir = join(projectRoot, 'android', 'img');
@@ -62,6 +63,8 @@ const main = async () => {
       '--splashBackgroundColorDark', '#11142b',
     ]);
     runAssets(relative(projectRoot, splashStage));
+    // Keep a full asset regeneration consistent with the car's version-controlled launcher mark.
+    await generateCarLauncherIcons();
   } finally {
     await rm(stagingRoot, { recursive: true, force: true });
   }

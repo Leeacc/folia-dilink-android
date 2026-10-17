@@ -52,6 +52,7 @@ TODO.MD
 commit.md
 .codebuff-ai/reasson/conf.jsonc
 scripts/*
+!scripts/generate-car-icon.mjs
 !scripts/generate-android-assets.mjs
 docs/TODO.md
 
