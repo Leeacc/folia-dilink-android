@@ -40,7 +40,8 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
         await click(page.locator('.lattice-tools button').first());
         await page.waitForSelector('.lattice-tools-panel', {state: 'visible'});
         await page.waitForTimeout(350);
-        for (const [width, height] of [[1920,1080],[960,720],[800,600],[412,732],[680,420]]) {
+        for (const [width, height, mode] of [[1920,1080,'full'],[960,720,'full'],[960,720,'split'],[800,600,'split'],[412,732,'split'],[680,420,'split']]) {
+            await page.evaluate(mode => document.documentElement.dataset.carWindow = mode, mode);
             await page.setViewportSize({width,height});
             console.log(`Checking car tools at ${width}x${height}`);
             // On software-rendered old Chromium, a fixed delay can sample the initial 0.9 scale.
@@ -64,8 +65,8 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
                     columns:getComputedStyle(element.querySelector('.lattice-tools-quick')).gridTemplateColumns.split(' ').length,quick};
             });
             if (geometry.left < 0 || geometry.top < 0 || geometry.right > width + 1 || geometry.bottom > height + 1
-                || geometry.width < Math.min(360,width - 32) || geometry.columns !== 3 || parseFloat(geometry.padding) < 16
-                || geometry.quick.some(button => button.width < 90 || button.height < 76 || !button.text)) {
+                || Math.abs(geometry.width - Math.min(mode === 'split' ? 360 : 460,width - 32)) > 1 || geometry.columns !== 3 || parseFloat(geometry.padding) !== (mode === 'split' ? 12 : 16)
+                || geometry.quick.some(button => button.width < 90 || button.height < (mode === 'split' ? 60 : 76) || !button.text)) {
                 throw new Error('Car tools geometry: '+JSON.stringify({width,height,...geometry}));
             }
             const tint = panel.locator('[role="menuitemcheckbox"]').first();
@@ -76,14 +77,14 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
             await click(tint);
             await page.waitForFunction(value => document.querySelector('.lattice-tools-panel [role="menuitemcheckbox"]')?.getAttribute('aria-checked') === value, before, {timeout:5000});
             await panel.evaluate(element => element.scrollTop = 0);
-            await page.screenshot({path:`${output}/wall-tools-${width}x${height}.png`});
+            await page.screenshot({path:`${output}/wall-tools-${width}x${height}-${mode}.png`});
             await click(panel.locator('.lattice-tools-help-trigger'));
             await page.waitForFunction(() => document.querySelector('.lattice-tools-help-trigger')?.getAttribute('aria-expanded') === 'true', null, {timeout:5000});
             await page.waitForSelector('.lattice-tools-help', {state:'visible',timeout:5000});
             const help = panel.locator('.lattice-tools-help');
             if (!(await help.isVisible())) throw new Error('Help could not be reached');
             await panel.evaluate(element => element.scrollTop = element.scrollHeight);
-            await page.screenshot({path:`${output}/wall-tools-${width}x${height}-help.png`});
+            await page.screenshot({path:`${output}/wall-tools-${width}x${height}-${mode}-help.png`});
             await click(panel.locator('.lattice-tools-help-trigger'));
             await page.waitForSelector('.lattice-tools-help', {state:'hidden',timeout:5000});
             const slider = panel.locator('input[type="range"]');
@@ -94,7 +95,7 @@ module.exports = async function checkWallTools(page, base = 'http://127.0.0.1:41
             await page.mouse.click(box.x + box.width * (Number(previous) > 0.5 ? 0.25 : 0.75), box.y + box.height / 2);
             await page.waitForFunction(value => document.querySelector('.lattice-tools-panel input[type="range"]')?.value !== value, previous, {timeout:5000});
             if (await slider.inputValue() === previous) throw new Error('Volume slider did not respond');
-            checks.push({viewport:{width,height},...geometry,interaction:true});
+            checks.push({viewport:{width,height,mode},...geometry,interaction:true});
         }
         if (errors.length || await page.locator('vite-error-overlay').count()) throw new Error(errors.join(';') || 'Framework error overlay');
     } finally {

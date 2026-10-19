@@ -11,7 +11,17 @@ import java.util.*;
 
 // Stream audio through the app origin so WebView CORS and mixed-content rules do not block CDNs.
 public final class MusicWebViewClient extends BridgeWebViewClient {
-    public MusicWebViewClient(Bridge bridge) { super(bridge); }
+    private final Bridge musicBridge;
+    public MusicWebViewClient(Bridge bridge) { super(bridge); musicBridge = bridge; }
+
+    @Override public void onPageFinished(WebView view, String url) {
+        super.onPageFinished(view, url);
+        if (musicBridge.getActivity() instanceof MainActivity) {
+            MainActivity activity = (MainActivity) musicBridge.getActivity();
+            activity.syncWindowLayout();
+            activity.restoreWindowAfterLayout();
+        }
+    }
 
     @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
         if (!"https".equals(request.getUrl().getScheme()) || !"localhost".equals(request.getUrl().getHost())

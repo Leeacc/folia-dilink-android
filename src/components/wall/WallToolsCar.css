@@ -72,3 +72,31 @@ html[data-runtime="capacitor-android"] .lattice-tools-help-trigger { width: 48px
 html[data-runtime="capacitor-android"] .lattice-tools-help li { min-height: 44px; font-size: 15px; }
 html[data-runtime="capacitor-android"] .lattice-tools-stack .lattice-tools-panel.has-quick-actions .lattice-tools-help ul { max-height: none; overflow: visible; }
 html[data-runtime="capacitor-android"] .lattice-tools-island { min-height: 88px; }
+
+/* A compact touch layout only for real Android panes; full-window sizes stay unchanged. */
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools {
+    --wall-tools-panel-width: min(360px, calc(100vw - 32px));
+    --wall-tools-top-reserve: 16px;
+}
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-panel {
+    gap: 6px;
+    padding: 12px;
+    border-radius: 20px;
+}
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-quick { gap: 8px; }
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-quick-action {
+    min-height: 60px;
+    gap: 4px;
+    padding: 6px 4px;
+}
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-quick-label { font-size: 12px; }
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-action {
+    min-height: 48px;
+    gap: 10px;
+    padding: 8px;
+    font-size: 15px;
+}
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-value { font-size: 13px; }
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-slider { min-height: 48px; gap: 8px; padding-right: 8px; }
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-slider-value { font-size: 14px; }
+html[data-runtime="capacitor-android"][data-car-window="split"] .lattice-tools-heading { padding-top: 10px; }
