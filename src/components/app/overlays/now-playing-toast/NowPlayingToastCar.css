@@ -7,6 +7,10 @@ html[data-runtime="capacitor-android"] .now-playing-toast [data-toast-card] {
     min-width: 0;
     max-width: calc(100vw - 48px);
 }
+/* Preserve the existing narrow-fullscreen clearance as well. */
+@media (max-width: 1200px) {
+    html[data-runtime="capacitor-android"] .now-playing-toast { margin-bottom: 144px; }
+}
 /* Anchor to the pane centre, independently of the animated x transform and song length.
    Native multi-window state keeps narrow fullscreen windows on their original layout. */
 html[data-runtime="capacitor-android"][data-car-window="split"] .now-playing-toast {

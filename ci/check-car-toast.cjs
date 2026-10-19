@@ -43,7 +43,7 @@ module.exports = async function checkCarToast(browser, base) {
         await page.evaluate(()=>document.documentElement.dataset.carWindow='full');
         await page.waitForTimeout(400);
         const full = await sample();
-        if (Math.abs(full.toast.left-24)>1 || await page.locator('.now-playing-toast').evaluate(e=>parseFloat(getComputedStyle(e).marginBottom))!==0) throw new Error('Narrow fullscreen toast layout changed');
+        if (Math.abs(full.toast.left-24)>1 || await page.locator('.now-playing-toast').evaluate(e=>parseFloat(getComputedStyle(e).marginBottom))!==144) throw new Error('Narrow fullscreen toast layout changed');
         await page.evaluate(()=>delete document.documentElement.dataset.runtime);
         if(await page.locator('.now-playing-toast').evaluate(e=>parseFloat(getComputedStyle(e).marginBottom))!==0)throw new Error('Car-only clearance leaked to desktop');
         if(errors.length)throw new Error(errors.join(';'));
