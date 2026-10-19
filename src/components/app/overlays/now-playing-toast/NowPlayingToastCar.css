@@ -7,8 +7,14 @@ html[data-runtime="capacitor-android"] .now-playing-toast [data-toast-card] {
     min-width: 0;
     max-width: calc(100vw - 48px);
 }
-@media (max-width: 1200px) {
-    html[data-runtime="capacitor-android"] .now-playing-toast {
-        margin-bottom: 144px;
-    }
+/* Anchor to the pane centre, independently of the animated x transform and song length.
+   Native multi-window state keeps narrow fullscreen windows on their original layout. */
+html[data-runtime="capacitor-android"][data-car-window="split"] .now-playing-toast {
+    left: 50%;
+    width: min(320px, calc(100vw - 48px));
+    margin-left: max(-160px, calc(-50vw + 24px));
+    margin-bottom: 144px;
+}
+html[data-runtime="capacitor-android"][data-car-window="split"] .now-playing-toast [data-toast-card] {
+    width: 100%;
 }

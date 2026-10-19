@@ -28,7 +28,7 @@ android {
         applicationId "io.github.leeacc.folia.dilink"
         minSdkVersion 26
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 72003
+        versionCode 72004
         versionName "${packageJson.version}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

@@ -59,6 +59,7 @@ public class CarMediaPlugin extends Plugin {
             .put("commandConnected",CarMediaService.listener != null).put("commandSubscribed",hasListeners("command"))
             .put("lastCommand",CarMediaService.lastCommand);
         getActivity().runOnUiThread(() -> {
+            if (getActivity() instanceof MainActivity) data.put("windowState", ((MainActivity)getActivity()).windowState());
             data.put("nativeAudio", NativeAudioPlugin.instance == null ? "unavailable" : NativeAudioPlugin.instance.snapshot())
                 .put("requestedOrientation", getActivity().getRequestedOrientation())
                 .put("lastBrowserClient", CarMediaService.lastBrowserClient)

@@ -16,7 +16,7 @@
 
 ## 下载与安装
 
-[Releases](https://github.com/Leeacc/folia-dilink-android/releases) 提供签名 APK、校验和、构建提交和上游版本。GitHub Actions 保留测试报告。仓库目前为私有，需要登录有权限的 GitHub 账号；可见性不会自动修改。
+[Releases](https://github.com/Leeacc/folia-dilink-android/releases) 提供签名 APK、校验和、构建提交和上游版本。GitHub Actions 保留测试报告。源码与发布 APK 公开提供；无需 Android Studio，可从 Releases 下载覆盖安装。
 
 迁移后的版本使用固定发布证书，以后可覆盖升级。早期 R 系列使用临时调试证书，第一次换到固定证书时如系统提示签名冲突，需要先导出设置，再卸载旧版并安装新版；旧登录状态可能需要重新扫码。
 
