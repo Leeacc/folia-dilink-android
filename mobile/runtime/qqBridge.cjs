@@ -48,6 +48,7 @@ function requestQq(endpoint, stateDir, port, token, method = 'GET', payload = ''
         '/logout',
         '/user',
         '/recommend',
+        '/search',
         '/radio',
         '/song',
         '/getMusicPlay',

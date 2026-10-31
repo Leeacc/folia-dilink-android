@@ -1,3 +1,4 @@
+import { appendRoundRect } from '../../../../../utils/canvasRoundRect';
 import { context2d, drawIcon, fitFont, fontSpec, strokeNeonText, type MachiFont } from '../../engine/signRaster';
 
 // src/components/visualizer/machi/scenes/station/stationSignPaint.ts
@@ -38,7 +39,7 @@ export const paintStationCanopy = (canvas: HTMLCanvasElement, paint: StationCano
     context.fillText(paint.name, textLeft, height * 0.53);
     context.fillStyle = paint.brand[2];
     context.beginPath();
-    context.roundRect(width - tagWidth - height * 0.12, height * 0.16, tagWidth, height * 0.68, height * 0.12);
+    appendRoundRect(context, width - tagWidth - height * 0.12, height * 0.16, tagWidth, height * 0.68, height * 0.12);
     context.fill();
     context.fillStyle = '#ffffff';
     context.textAlign = 'center';

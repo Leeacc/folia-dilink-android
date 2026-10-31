@@ -66,3 +66,17 @@ test('packaged private listener exposes Qishui only through authenticated native
         assert.deepEqual(result,{data:{ok:true,data:null}});
     } finally {child.kill();await closed;fs.rmSync(folder,{recursive:true,force:true});}
 });
+
+
+test('an unreadable session envelope does not prevent other music providers from starting', () => {
+    const folder=fs.mkdtempSync(path.join(os.tmpdir(),'folia-store-'));
+    try {
+        for(const raw of ['null','[]','broken']) {
+            fs.writeFileSync(path.join(folder,'qishui-session.json'),raw);
+            const store=createPrivateStore(folder,'qishui-session.json');
+            assert.equal(store.get('QISHUI_SESSION_V1'),undefined);
+            store.set('QISHUI_DEVICE_ID','fixture');
+            assert.equal(store.get('QISHUI_DEVICE_ID'),'fixture');
+        }
+    } finally {fs.rmSync(folder,{recursive:true,force:true});}
+});

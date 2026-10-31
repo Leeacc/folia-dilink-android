@@ -1,3 +1,4 @@
+import { appendRoundRect } from '../../../../utils/canvasRoundRect';
 // Copyright (c) 2026 chthollyphile
 import type { Texture } from 'pixi.js';
 import { resolveLucideIconNode } from '../../../../services/lucideIconResolver';
@@ -117,7 +118,7 @@ const pathBubble = (context: Context2D, c: number, r: number) => {
     const h = r * 0.72;
     const top = c - h * 0.95;
     const radius = h * 0.55;
-    context.roundRect(c - w, top, w * 2, h * 1.6, radius);
+    appendRoundRect(context, c - w, top, w * 2, h * 1.6, radius);
     context.moveTo(c - w * 0.35, top + h * 1.55);
     context.lineTo(c - w * 0.62, top + h * 2.15);
     context.lineTo(c - w * 0.02, top + h * 1.55);
@@ -328,7 +329,7 @@ export const createCollageTextureCache = (pixi: PixiModule, resolution: number, 
             const x = k * pitch + (pitch - holeW) / 2;
             [height * 0.07, height * 0.93 - holeH].forEach(y => {
                 context.beginPath();
-                context.roundRect(x, y, holeW, holeH, holeH * 0.3);
+                appendRoundRect(context, x, y, holeW, holeH, holeH * 0.3);
                 context.fill();
             });
         }
@@ -344,11 +345,11 @@ export const createCollageTextureCache = (pixi: PixiModule, resolution: number, 
             const h = height * 0.5;
             context.fillStyle = css(colors[k]!, 0.92);
             context.beginPath();
-            context.roundRect(x, y, w, h, h * 0.12);
+            appendRoundRect(context, x, y, w, h, h * 0.12);
             context.fill();
             context.fillStyle = 'rgba(255,255,255,0.28)';
             context.beginPath();
-            context.roundRect(x + w * 0.06, y + h * 0.1, w * 0.4, h * 0.16, h * 0.08);
+            appendRoundRect(context, x + w * 0.06, y + h * 0.1, w * 0.4, h * 0.16, h * 0.08);
             context.fill();
             context.fillStyle = 'rgba(255,255,255,0.9)';
             context.save();
@@ -579,15 +580,15 @@ export const createCollageTextureCache = (pixi: PixiModule, resolution: number, 
             const { canvas, context } = canvasOf(width + 4, height + 4);
             context.fillStyle = 'rgba(43,31,61,0.85)';
             context.beginPath();
-            context.roundRect(3, 3, width, height, height / 2);
+            appendRoundRect(context, 3, 3, width, height, height / 2);
             context.fill();
             context.fillStyle = '#ffffff';
             context.beginPath();
-            context.roundRect(0, 0, width, height, height / 2);
+            appendRoundRect(context, 0, 0, width, height, height / 2);
             context.fill();
             context.fillStyle = css(color);
             context.beginPath();
-            context.roundRect(2, 2, width - 4, height - 4, (height - 4) / 2);
+            appendRoundRect(context, 2, 2, width - 4, height - 4, (height - 4) / 2);
             context.fill();
             context.font = font;
             context.textAlign = 'center';

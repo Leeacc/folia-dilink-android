@@ -1,3 +1,4 @@
+import { appendRoundRect } from '../../../../../utils/canvasRoundRect';
 import { fitFont, fontSpec, strokeNeonText, type MachiFont } from '../../engine/signRaster';
 
 // src/components/visualizer/machi/scenes/kowloon/kowloonSignPaint.ts
@@ -41,7 +42,7 @@ export const resolveKowloonVerticalText = (text: string): { mode: 'stack'; glyph
 
 const roundRect = (context: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) => {
     context.beginPath();
-    context.roundRect(x, y, width, height, radius);
+    appendRoundRect(context, x, y, width, height, radius);
 };
 
 /** 板面：霓虹是深色底加一圈灯管边，灯箱是亮色板面加一道内边。返回写字用的颜色与写法。 */

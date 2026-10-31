@@ -1,3 +1,4 @@
+import { appendRoundRect } from '../../utils/canvasRoundRect';
 import type { IconNode } from 'lucide-react';
 
 // src/components/visualizer/lucidePath2d.ts
@@ -20,7 +21,7 @@ export const lucideIconPath2d = (node: IconNode, into = new Path2D()) => {
             into.moveTo(n('cx') + n('rx'), n('cy'));
             into.ellipse(n('cx'), n('cy'), n('rx'), n('ry'), 0, 0, Math.PI * 2);
         } else if (tag === 'rect') {
-            into.roundRect(n('x'), n('y'), n('width'), n('height'), Math.min(n('rx', n('ry')), n('width') / 2, n('height') / 2));
+            appendRoundRect(into, n('x'), n('y'), n('width'), n('height'), Math.min(n('rx', n('ry')), n('width') / 2, n('height') / 2));
         } else if (tag === 'line') {
             into.moveTo(n('x1'), n('y1'));
             into.lineTo(n('x2'), n('y2'));

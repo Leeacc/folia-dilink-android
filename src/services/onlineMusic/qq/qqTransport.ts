@@ -537,7 +537,9 @@ export const requestQqMusicu = async (
     };
     // The answer and its body, read together: the time limit covers both. A refused answer's body is not read.
     const send = async (signal: AbortSignal) => {
-        const response = await fetch(url, { ...init, signal });
+        const result = hasEmbeddedMusic() ? await requestEmbeddedMusic('qq', '/getFoliaRpc', init) : null;
+        const response = result ? new Response(JSON.stringify(result.body), {status:result.status})
+            : await fetch(url, { ...init, signal });
         return { response, text: response.ok ? await response.text() : '' };
     };
 

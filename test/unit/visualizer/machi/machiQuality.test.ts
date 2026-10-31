@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { resolveMachiRenderQuality } from '@/components/visualizer/machi/engine/quality';
 import { DEFAULT_MACHI_QUALITY, MACHI_QUALITY_PRESETS, type MachiQuality } from '@/components/visualizer/machi/types';
 
@@ -91,5 +91,14 @@ describe('resolveMachiRenderQuality', () => {
         const preview = at({ ...DEFAULT_MACHI_QUALITY, antialias: 'ssaa' }, 4, 2, true);
         expect(preview).toMatchObject({ pixelRatio: 1, samples: 0, postAA: 'smaa', inkScale: 1, shadowMapSize: 1024, bloom: false, streaks: false, dof: true, degrade: 0 });
         expect(at(DEFAULT_MACHI_QUALITY, 0, 2, true)).toMatchObject({ pixelRatio: 1, samples: 0, postAA: 'smaa' });
+    });
+});
+
+
+describe('legacy car WebGL target compatibility', () => {
+    it('retains post-process antialiasing without the broken multisampled HDR depth resolve', () => {
+        vi.stubGlobal('CSS',{supports:()=>false});
+        try {expect(at(DEFAULT_MACHI_QUALITY)).toMatchObject({samples:0,postAA:'smaa'});}
+        finally {vi.unstubAllGlobals();}
     });
 });

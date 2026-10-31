@@ -94,7 +94,8 @@ export const resolveMachiRenderQuality = (quality: MachiQuality, options: MachiR
     const pixelRatio = antialias === 'ssaa' ? Math.max(base, Math.min(base * SUPERSAMPLE, MAX_SUPERSAMPLED_RATIO)) : base;
     return {
         pixelRatio,
-        samples: antialias === 'smaa' && !options.previewMode ? SMAA_SAMPLES : 0,
+        // Chromium 95 cannot reliably resolve the HDR/depth multisample target; keep post-process AA.
+        samples: antialias === 'smaa' && !options.previewMode && (typeof CSS === 'undefined' || CSS.supports('width', '1cqw')) ? SMAA_SAMPLES : 0,
         postAA: antialias === 'fxaa' ? 'fxaa' : antialias === 'smaa' ? 'smaa' : 'none',
         inkScale: pixelRatio / base,
         shadowMapSize: SHADOW_MAP_SIZES[shadows],

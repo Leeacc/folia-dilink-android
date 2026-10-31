@@ -5,7 +5,7 @@ const native = vi.hoisted(() => ({request: vi.fn()}));
 vi.mock('@/services/embeddedMusic', () => ({hasEmbeddedMusic:()=>true, requestEmbeddedMusic:native.request}));
 import {getQishuiAvailability, requestQishui} from '@/services/onlineMusic/qishui/qishuiTransport';
 import {requestKugou} from '@/services/onlineMusic/kugou/kugouTransport';
-import {requestQq} from '@/services/onlineMusic/qq/qqTransport';
+import {requestQq, requestQqMusicu} from '@/services/onlineMusic/qq/qqTransport';
 import {neteaseApi} from '@/services/onlineMusic/netease/netease';
 
 beforeEach(() => {native.request.mockReset();vi.stubGlobal('window',{});});
@@ -28,6 +28,18 @@ describe('Android embedded providers after upstream module migration', () => {
     it('keeps QQ HTTP refusal status across the native wrapper', async () => {
         native.request.mockResolvedValue({status:401,body:{code:401}});
         await expect(requestQq('login_status')).rejects.toMatchObject({code:'auth-required',httpStatus:401});
+    });
+    it('routes batched QQ numeric metadata through the private bridge instead of a missing Web proxy', async () => {
+        native.request.mockResolvedValue({status:200,body:{code:0,q0:{code:0,data:{track_info:{id:123}}}}});
+        const requests={q0:{module:'music.pf_song_detail_svr',method:'get_song_detail_yqq',param:{song_type:0,song_id:123}}};
+        await expect(requestQqMusicu(requests)).resolves.toMatchObject({q0:{code:0}});
+        expect(native.request.mock.calls[0][1]).toBe('/getFoliaRpc');
+        expect(JSON.parse(native.request.mock.calls[0][2].body).q0.param.song_id).toBe(123);
+    });
+    it('preserves the signed-in QQ search route at the native boundary', async () => {
+        native.request.mockResolvedValue({status:200,body:{code:0}});
+        await requestQq('search',{key:'test'});
+        expect(native.request.mock.calls[0][1]).toMatch(/^\/search\?/);
     });
     it('routes NetEase login status into the packaged backend', async () => {
         native.request.mockResolvedValue({code:200,data:{profile:null}});

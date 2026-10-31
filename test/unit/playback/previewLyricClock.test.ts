@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LyricData } from '@/types';
 import { PlayerState } from '@/types';
-import { currentTime, handoffLyricCurrentTime, lyricCurrentTime } from '@/stores/motionSignals';
+import { audioPower, audioBands, currentTime, handoffLyricCurrentTime, lyricCurrentTime } from '@/stores/motionSignals';
 import { setCurrentLineIndex } from '@/stores/usePlaybackStore';
 import { usePlaybackVisualizerBridge } from '@/components/app/playback/bridges/usePlaybackVisualizerBridge';
 import { buildObsBrowserSourceClock, resolveObsBrowserSourceClockTime } from '@/utils/obsBrowserSource';
@@ -9,6 +9,7 @@ import { buildObsBrowserSourceClock, resolveObsBrowserSourceClockTime } from '@/
 // Exercises the real frame and handover paths without a renderer, using the same preview lookup
 // contract as the OBS publisher. Media progress and saved manual offsets remain clip-relative.
 const env = vi.hoisted(() => ({
+    native: false,
     effects: [] as Array<() => unknown>,
     cleanup: [] as Array<() => void>,
     frame: null as FrameRequestCallback | null,
@@ -18,6 +19,7 @@ const env = vi.hoisted(() => ({
     version: 0,
     lookup: vi.fn((url: string): number => 0),
 }));
+vi.mock('@/services/android/nativeAudio', () => ({nativeAudioEnabled:()=>env.native}));
 vi.mock('react', async importOriginal => ({
     ...(await importOriginal<typeof import('react')>()),
     useCallback: (fn: unknown) => fn,
@@ -83,6 +85,7 @@ const obs = (url: string, manualOffsetMs = 500) => buildObsBrowserSourceClock({
 }, env.starts.get(url) ?? 0);
 
 beforeEach(() => {
+    env.native=false;
     env.starts.clear(); env.version = 0;
     env.lookup.mockReset().mockImplementation(url => env.starts.get(url) ?? 0);
     env.effects = []; env.cleanup = []; env.subscriber = null;
@@ -233,5 +236,19 @@ describe('preview lyric clock consumers', () => {
         mount(deck);
         dispatch('seeked', deck);
         expect(lyricCurrentTime.get()).toBe(-0.5);
+    });
+});
+
+
+describe('native spectrum ownership after the upstream bridge move', () => {
+    it('keeps native FFT intact while updating the real media clock', () => {
+        env.native=true;
+        mount(audio('https://audio.test/native',9));
+        const spectrum=new Uint8Array([0,42,128,255]);
+        audioBands.spectrum.set(spectrum);audioPower.set(73);
+        frame();
+        expect(audioBands.spectrum.get()).toBe(spectrum);
+        expect(audioPower.get()).toBe(73);
+        expect(currentTime.get()).toBe(9);
     });
 });

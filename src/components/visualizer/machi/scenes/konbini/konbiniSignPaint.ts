@@ -1,3 +1,4 @@
+import { appendRoundRect } from '../../../../../utils/canvasRoundRect';
 import { context2d, drawIcon, fitFont, fontSpec, wrapText, type MachiFont } from '../../engine/signRaster';
 
 // src/components/visualizer/machi/scenes/konbini/konbiniSignPaint.ts
@@ -39,7 +40,7 @@ export const paintKonbiniFascia = (canvas: HTMLCanvasElement, paint: KonbiniFasc
     // 右边：品牌色小块里写 24H。
     context.fillStyle = paint.brand[2];
     context.beginPath();
-    context.roundRect(width - tagWidth - height * 0.15, height * 0.18, tagWidth, height * 0.64, height * 0.12);
+    appendRoundRect(context, width - tagWidth - height * 0.15, height * 0.18, tagWidth, height * 0.64, height * 0.12);
     context.fill();
     context.fillStyle = '#ffffff';
     context.textAlign = 'center';
@@ -118,7 +119,7 @@ export const paintKonbiniPoster = (canvas: HTMLCanvasElement, paint: KonbiniPost
     context.rotate(0.22);
     context.fillStyle = paint.accent;
     context.beginPath();
-    context.roundRect(-width * 0.17, -width * 0.06, width * 0.34, width * 0.12, width * 0.03);
+    appendRoundRect(context, -width * 0.17, -width * 0.06, width * 0.34, width * 0.12, width * 0.03);
     context.fill();
     context.fillStyle = '#ffffff';
     fitFont(context, { ...paint.font, weight: 800 }, paint.tag, width * 0.28, width * 0.08);

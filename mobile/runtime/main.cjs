@@ -59,7 +59,7 @@ async function dispatch(provider, endpoint, method = 'GET', payload = '') {
     return qishui.request(endpoint.slice(1), JSON.parse(payload || '{}'));
   }
   if (provider === 'qq') {
-    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|radio\/|song\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
+    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|search(?:\?|$)|radio\/|song\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
     return requestQq(endpoint, stateDir, server.address().port, secret, method, payload);
   }
   const url = new URL(endpoint, 'http://localhost');

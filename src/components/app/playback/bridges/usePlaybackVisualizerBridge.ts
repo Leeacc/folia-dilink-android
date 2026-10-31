@@ -1,3 +1,4 @@
+import { nativeAudioEnabled } from '../../../../services/android/nativeAudio';
 import { useCallback, useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import type { MotionValue } from 'framer-motion';
@@ -247,7 +248,9 @@ export function usePlaybackVisualizerBridge({
         // a visible stutter at exactly the moment meant to be seamless.
         const hasAudibleSignal = isActuallyPlaying || isTransitionAudible();
 
-        if (backgroundHold) {
+        if (nativeAudioEnabled()) {
+            // Native capture owns the spectrum; this loop still advances the lyric clock below.
+        } else if (backgroundHold) {
             // The bands keep their last values: nothing draws from them while held.
         } else if (hasAudibleSignal && analyserRef.current) {
             const bufferLength = analyserRef.current.frequencyBinCount;

@@ -5,7 +5,10 @@ const path = require('node:path');
 function createPrivateStore(stateDir, fileName) {
     const file = path.join(stateDir, fileName);
     let values = {};
-    try { values = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
+    try {
+        const restored = JSON.parse(fs.readFileSync(file, 'utf8'));
+        if (restored && typeof restored === 'object' && !Array.isArray(restored)) values = restored;
+    } catch {}
     const save = () => {
         fs.writeFileSync(file + '.tmp', JSON.stringify(values), {mode: 0o600});
         fs.renameSync(file + '.tmp', file);

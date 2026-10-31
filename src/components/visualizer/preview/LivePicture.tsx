@@ -137,7 +137,9 @@ const ImageOnStage: React.FC<{ image: HTMLElement; style: React.CSSProperties }>
 };
 
 export const LivePicture: React.FC<LivePictureProps> = ({ imageKey, visible, chosen, active, glyph, children }) => {
-    const { stage, theme, making: mayMake } = useLyricPreview();
+    const { stage, theme, making: allowedToMake } = useLyricPreview();
+    // Old car GPUs rasterize only the chosen/pointed thumbnail; every style remains available in the main preview.
+    const mayMake = allowedToMake && (typeof CSS === 'undefined' || CSS.supports('width', '1cqw') || chosen || active);
     const id = useId();
     const boxRef = useRef<HTMLDivElement>(null);
     const stageRef = useRef<HTMLDivElement>(null);
