@@ -57,7 +57,7 @@ const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded 
             const errors=[];page.on('pageerror',e=>errors.push(e.message));
             await page.goto(`${base}/dev-probe.html?probe=visualizerMemory&vis=${mode}&lines=24&speed=2&start=3`,{waitUntil:'domcontentloaded'});
             await page.waitForSelector(`[data-probe-mode="${mode}"]`,{timeout:60000});
-            const pixi = ['lumiere','sonnet','tempera','machi'].includes(mode)
+            const pixi = mode === 'machi' ? await require('./check-machi-draw.cjs')(page) : ['lumiere','sonnet','tempera'].includes(mode)
                 ? await require('./check-pixi-draw.cjs')(page) : null;
             if(!pixi) await page.waitForTimeout(2500);
             const sample=await page.evaluate(()=>({children:document.querySelector('[data-probe-mode]')?.children.length,canvases:document.querySelectorAll('canvas').length}));
