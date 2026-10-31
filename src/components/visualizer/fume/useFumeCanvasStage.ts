@@ -1,6 +1,6 @@
 import { carCanvasPixelRatio, carFrameInterval } from '../../../utils/carPerformance';
 import { useEffect, useRef, type RefObject } from 'react';
-import { drawFumeBackground } from '../FumeBackground';
+import { drawFumeBackground } from './FumeBackground';
 import { isGlowBlurQuantized } from '../../../utils/glowBlurQuantize';
 import type { StaticBlockSnapshot } from './fumeTypes';
 import { resolveFumeBackgroundView, stepFumeCamera, syncFumeCameraToArticle } from './fumeCameraStep';

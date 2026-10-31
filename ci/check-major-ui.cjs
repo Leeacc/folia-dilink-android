@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const { chromium } = require(process.env.FOLIA_LEGACY_PLAYWRIGHT || '@playwright/test');
 
 // The production build and synthetic upstream probes have different roles; neither substitutes for native audio checks.
-const modes = ['classic','cadenza','partita','fume','cappella','tilt','claddagh','monet','diorama','pendolo','lumiere','sonnet','still','tempera'];
+const modes = ['classic','cadenza','partita','fume','cappella','tilt','claddagh','monet','diorama','pendolo','lumiere','sonnet','still','tempera','hanabi','machi','nebbia'];
 const out = process.env.FOLIA_UI_OUTPUT || 'artifacts/major-ui';
 // Software-rendered Chromium95 plus the full responsive suite needs a bounded 15-minute budget.
 const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded its 15-minute budget'); process.exit(1); }, 900000);

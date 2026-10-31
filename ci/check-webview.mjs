@@ -61,6 +61,21 @@ if (webViewMajor >= 95) {
         network[provider] = {key:Boolean(result.data?.data?.unikey || result.data?.data?.qrcode), code:result.data?.code, diagnostic:result.data?.diagnostic, file:result.data?.file, message: typeof result.data?.msg === 'string' ? result.data.msg.replace(/https?:[^ ]+/g,'[host]').slice(0,160) : undefined};
       } catch { network[provider] = false; }
     }
+    const qishuiRequest = async (operation, params={}) => (await window.Capacitor.nativePromise('EmbeddedMusic','request',{
+      provider:'qishui',endpoint:'/'+operation,method:'POST',payload:JSON.stringify(params)
+    })).data;
+    const qishui = {authenticatedPlayback:'requires user scan'};
+    const started = await qishuiRequest('login_qr_key');
+    if (!started.ok) throw new Error('Qishui QR start failed: '+started.error?.code);
+    const qr = await qishuiRequest('login_qr_create',started.data);
+    qishui.qrGenerated = qr.ok && qr.data?.imageUrl?.startsWith('data:image/png;base64,');
+    if (!qishui.qrGenerated) throw new Error('Qishui QR image missing');
+    const waiting = await qishuiRequest('login_qr_check',started.data);
+    qishui.waiting = waiting.ok && waiting.data?.state === 'waiting';
+    await qishuiRequest('login_qr_cancel',started.data);
+    const songs = await qishuiRequest('search',{query:'平凡之路',limit:5});
+    qishui.search = songs.ok && songs.data?.items?.length > 0;
+    if (!qishui.search) throw new Error('Qishui search failed: '+songs.error?.code);
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const state = {view:'player', appHistoryIndex:0};
     history.replaceState(state, '', '#player');
@@ -105,6 +120,25 @@ if (webViewMajor >= 95) {
       } catch (error) { checked.error = error.name; }
       finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     }
+    // A platform-issued plaintext stream must prepare and advance on the actual Android player.
+    qishui.nativePlaying = false;
+    const nativeAudio = (method, params={}) => window.Capacitor.nativePromise('NativeAudio',method,params);
+    try {
+      for (const track of songs.data.items.slice(0,5)) {
+        const id=String(track.base_info?.id || track.id);
+        const source=await qishuiRequest('audio',{id,quality:'standard'});
+        if (!source.ok) continue;
+        qishui.preview=Boolean(source.data.preview);
+        await nativeAudio('setGain',{value:0.05});
+        await nativeAudio('prepare',{source:source.data.url,sourceId:'ci-qishui'});
+        await nativeAudio('play');
+        await delay(1500);
+        const status=await nativeAudio('status');
+        qishui.nativePlaying=Boolean(status.playing && status.position>0);
+        break;
+      }
+    } finally {await nativeAudio('pause');}
+    if (!qishui.nativePlaying) throw new Error('Qishui native playback did not advance');
     // Record both provider refusals and bridge failures before failing the check.
     const qq = {search:false,qrVisible:false,authenticatedPlayback:'requires user scan'};
     try {
@@ -134,7 +168,7 @@ if (webViewMajor >= 95) {
       }
       qq.dialogText = document.querySelector('[data-bravais-account-login="qq"]')?.textContent?.slice(0,400);
     } catch (error) { qq.error = error.message; }
-    return {embeddedQr:true, network, back:true, media, qq};
+    return {embeddedQr:true, network, back:true, media, qq, qishui};
   })()`}}));
   const inspected = await result;
   native.close();

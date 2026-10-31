@@ -12,6 +12,7 @@ import path from 'path';
 const { createCrashLog, installCrashHandlers, orderedCrashFiles, resolveCrashLogDir } = require('../../../electron/debug/crashLog.cjs');
 
 let workspace = '';
+const hostPlatform = Object.getOwnPropertyDescriptor(process, 'platform')!;
 
 /** An `app` shaped like Electron's, with the two paths this module reads. */
 const fakeApp = (paths: { exe: string; userData: string }, isReady = true) => ({
@@ -29,12 +30,15 @@ const locale = {
 };
 
 beforeEach(() => {
+    // The writable-install cases describe Linux/Windows; macOS bundle behavior has its own test.
+    Object.defineProperty(process, 'platform', {value: 'linux'});
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'folia-crash-'));
 });
 
 afterEach(() => {
     fs.rmSync(workspace, { recursive: true, force: true });
     vi.restoreAllMocks();
+    Object.defineProperty(process, 'platform', hostPlatform);
 });
 
 const build = (overrides: Record<string, unknown> = {}) => {
@@ -239,6 +243,36 @@ describe('which failures reach the user', () => {
     };
 
     const gone = (reason: string) => ({ reason, exitCode: 1 });
+
+    it('asks for the pages\' storage to be written before it exits after an uncaught exception, and exits when that fails', () => {
+        for (const flushed of [() => {}, () => { throw new Error('not ready'); }]) {
+            const order: string[] = [];
+            const flushStorage = vi.fn(() => { order.push('flush'); flushed(); });
+            withHandlers(app => {
+                app.exit.mockImplementation(() => { order.push('exit'); });
+                const ours = process.listeners('uncaughtException').at(-1)!;
+                ours(new Error('boom'), 'uncaughtException');
+                expect(order).toEqual(['flush', 'exit']);
+                expect(app.exit).toHaveBeenCalledWith(1);
+            }, { flushStorage });
+        }
+    });
+
+    it('runs beforeExit right before the exit after an uncaught exception, and exits when it throws', () => {
+        // app.exit() 跳过 before-quit / will-quit：HiFi 的 mpv 子进程在这里杀。
+        for (const beforeExitResult of [() => {}, () => { throw new Error('already gone'); }]) {
+            const order: string[] = [];
+            const flushStorage = vi.fn(() => { order.push('flush'); });
+            const beforeExit = vi.fn(() => { order.push('beforeExit'); beforeExitResult(); });
+            withHandlers(app => {
+                app.exit.mockImplementation(() => { order.push('exit'); });
+                const ours = process.listeners('uncaughtException').at(-1)!;
+                ours(new Error('boom'), 'uncaughtException');
+                expect(order).toEqual(['flush', 'beforeExit', 'exit']);
+                expect(app.exit).toHaveBeenCalledWith(1);
+            }, { flushStorage, beforeExit });
+        }
+    });
 
     it('ignores a renderer that exited cleanly', () => {
         withHandlers((app, report) => {
