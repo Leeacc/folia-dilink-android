@@ -126,6 +126,8 @@ jobs:
     timeout-minutes: 22
     env:
       ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      FOLIA_NEBBIA_GPU_BACKEND: mesa
       VITE_NETEASE_API_BASE: ${{ vars.VITE_NETEASE_API_BASE }}
       VITE_KUGOU_API_BASE: ${{ vars.VITE_KUGOU_API_BASE }}
       VITE_FOLIA_API_BASE: ${{ vars.VITE_FOLIA_API_BASE }}
@@ -141,6 +143,10 @@ jobs:
         run: npm run build:capacitor
       - name: Compile isolated UI fixtures for Chromium 95
         run: FOLIA_UI_PROBES=1 npm run build:capacitor -- --outDir probe-dist
+      - name: Install Mesa software driver and virtual display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y xvfb libgl1-mesa-dri libglx-mesa0
       - name: Verify compiled UI on Chromium 95
         run: |
           npm install --prefix "$RUNNER_TEMP/legacy-pw" --ignore-scripts --no-audit --no-fund playwright@1.15.2
@@ -149,7 +155,7 @@ jobs:
           npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/preview.log" 2>&1 &
           npm run preview -- --host 127.0.0.1 --port 4191 --outDir probe-dist > "$RUNNER_TEMP/probes.log" 2>&1 &
           sleep 3
-          FOLIA_REQUIRE_CHROMIUM95=1 FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-major-ui.cjs
+          FOLIA_REQUIRE_CHROMIUM95=1 FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" xvfb-run -a node ci/check-major-ui.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

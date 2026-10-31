@@ -9,9 +9,10 @@ const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded 
 (async () => {
     fs.mkdirSync(out, {recursive: true});
     fs.mkdirSync('artifacts/chromium95', {recursive: true});
-    const launchBrowser = () => chromium.launch({headless: true, executablePath: process.env.FOLIA_CHROMIUM_EXECUTABLE, args:['--no-sandbox','--use-gl=swiftshader']});
+    const launchBrowser = (backend='swiftshader') => chromium.launch({headless: backend!=='mesa', executablePath: process.env.FOLIA_CHROMIUM_EXECUTABLE,
+        args:backend==='mesa'?['--no-sandbox','--use-gl=desktop','--ignore-gpu-blocklist']:['--no-sandbox','--use-gl=swiftshader']});
     let browser = await launchBrowser();
-    const report = {browser: browser.version(), modes: [], scope: 'Compiled UI/probes, synthetic lyrics and spectrum. Nebbia uses a bounded static shader frame on the software GPU; full-size motion is checked locally on Chromium96. Native audio verified separately.'};
+    const report = {browser: browser.version(), modes: [], scope: 'Compiled UI/probes, synthetic lyrics and spectrum. Nebbia uses Mesa to avoid the old SwiftShader JIT stall; all styles run at 1280x720. Native audio verified separately.'};
     if (process.env.FOLIA_REQUIRE_CHROMIUM95 && !report.browser.startsWith('95.')) throw new Error('Expected actual Chromium 95');
     const base = process.env.FOLIA_UI_BASE || 'http://127.0.0.1:4191';
     try {
@@ -55,15 +56,16 @@ const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded 
         await page.close();
         for (const mode of modes) {
             // Give the large new shader scenes a clean software-GPU process on the CI runner.
-            if (mode === 'machi' || mode === 'nebbia') { await browser.close(); browser = await launchBrowser(); }
-            const viewport=mode==='nebbia'?{width:480,height:270}:{width:1280,height:720};
+            const backend=mode==='nebbia'?(process.env.FOLIA_NEBBIA_GPU_BACKEND || 'swiftshader'):'swiftshader';
+            if (mode === 'machi' || mode === 'nebbia') { await browser.close(); browser = await launchBrowser(backend); }
+            const viewport={width:1280,height:720};
             page=await browser.newPage({viewport});
             const errors=[];page.on('pageerror',e=>errors.push(e.message));
             page.on('console',message=>{
                 const text=message.text();
                 if(mode==='nebbia' && text.startsWith('[Nebbia]')) {console.log(text);if(/failed/.test(text))errors.push(text);}
             });
-            await page.goto(`${base}/dev-probe.html?probe=visualizerMemory&vis=${mode}&lines=24&speed=2&start=3${mode==='nebbia'?'&freeze=1':''}`,{waitUntil:'domcontentloaded'});
+            await page.goto(`${base}/dev-probe.html?probe=visualizerMemory&vis=${mode}&lines=24&speed=2&start=3`,{waitUntil:'domcontentloaded'});
             await page.waitForSelector(`[data-probe-mode="${mode}"]`,{state:'attached',timeout:120000});
             if(mode==='nebbia')await page.waitForFunction(()=>document.querySelector('[data-probe-mode="nebbia"] canvas') && !document.querySelector('[data-picture-arriving]'),undefined,{timeout:120000});
             const pixi = mode === 'machi' ? await require('./check-machi-draw.cjs')(page) : ['lumiere','sonnet','tempera'].includes(mode)
@@ -71,7 +73,7 @@ const deadline = setTimeout(() => { console.error('Chromium95 UI suite exceeded 
             if(!pixi) await page.waitForTimeout(2500);
             const sample=await page.evaluate(()=>({children:document.querySelector('[data-probe-mode]')?.children.length,canvases:document.querySelectorAll('canvas').length}));
             await page.screenshot({path:`${out}/${mode}.png`});
-            report.modes.push({mode,viewport,staticProbe:mode==='nebbia',...sample,pixi,errors});
+            report.modes.push({mode,viewport,backend,...sample,pixi,errors});
             console.log(JSON.stringify(report.modes[report.modes.length-1]));
             if(errors.length || !sample.children)throw new Error(`${mode} failed: ${errors.join(';')}`);
             await page.close();
