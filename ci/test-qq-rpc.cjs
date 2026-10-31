@@ -14,3 +14,14 @@ test('does not forward arbitrary RPC modules to the music provider',async()=>{
     await assert.rejects(()=>requestQqRpc(JSON.stringify({request:{method:'DeleteAccount',module:'arbitrary',param:{}}}),{post:async()=>{called=true;}}));
     assert.equal(called,false);
 });
+test('forwards bounded numeric and mid song details without accepting arbitrary subrequests',async()=>{
+    const calls=[];const client={post:async(url,payload)=>{calls.push({url,payload});return{status:200,data:{code:0,q0:{code:0}}};}};
+    const detail=param=>({module:'music.pf_song_detail_svr',method:'get_song_detail_yqq',param});
+    await requestQqRpc(JSON.stringify({comm:{cookie:'must-not-forward'},q0:detail({song_type:0,song_id:123}),q1:detail({song_type:0,song_mid:'000testMID'})}),client);
+    assert.equal(calls[0].payload.q0.param.song_id,123);
+    assert.equal(calls[0].payload.q1.param.song_mid,'000testMID');
+    assert.deepEqual(calls[0].payload.comm,{ct:24,cv:0});
+    await assert.rejects(()=>requestQqRpc(JSON.stringify({q0:detail({song_type:0,song_id:'123'})}),client));
+    await assert.rejects(()=>requestQqRpc(JSON.stringify({q0:detail({song_type:0,song_id:123}),q1:{module:'private',method:'write',param:{}}}),client));
+    assert.equal(calls.length,1);
+});

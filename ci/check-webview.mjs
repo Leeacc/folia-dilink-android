@@ -61,6 +61,21 @@ if (webViewMajor >= 95) {
         network[provider] = {key:Boolean(result.data?.data?.unikey || result.data?.data?.qrcode), code:result.data?.code, diagnostic:result.data?.diagnostic, file:result.data?.file, message: typeof result.data?.msg === 'string' ? result.data.msg.replace(/https?:[^ ]+/g,'[host]').slice(0,160) : undefined};
       } catch { network[provider] = false; }
     }
+    const qishuiRequest = async (operation, params={}) => (await window.Capacitor.nativePromise('EmbeddedMusic','request',{
+      provider:'qishui',endpoint:'/'+operation,method:'POST',payload:JSON.stringify(params)
+    })).data;
+    const qishui = {authenticatedPlayback:'requires user scan'};
+    const started = await qishuiRequest('login_qr_key');
+    if (!started.ok) throw new Error('Qishui QR start failed: '+started.error?.code);
+    const qr = await qishuiRequest('login_qr_create',started.data);
+    qishui.qrGenerated = qr.ok && qr.data?.imageUrl?.startsWith('data:image/png;base64,');
+    if (!qishui.qrGenerated) throw new Error('Qishui QR image missing');
+    const waiting = await qishuiRequest('login_qr_check',started.data);
+    qishui.waiting = waiting.ok && waiting.data?.state === 'waiting';
+    await qishuiRequest('login_qr_cancel',started.data);
+    const songs = await qishuiRequest('search',{query:'平凡之路',limit:5});
+    qishui.search = songs.ok && songs.data?.items?.length > 0;
+    if (!qishui.search) throw new Error('Qishui search failed: '+songs.error?.code);
     const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const state = {view:'player', appHistoryIndex:0};
     history.replaceState(state, '', '#player');
@@ -105,6 +120,25 @@ if (webViewMajor >= 95) {
       } catch (error) { checked.error = error.name; }
       finally { audio.pause(); audio.removeAttribute('src'); audio.load(); }
     }
+    // A platform-issued plaintext stream must prepare and advance on the actual Android player.
+    qishui.nativePlaying = false;
+    const nativeAudio = (method, params={}) => window.Capacitor.nativePromise('NativeAudio',method,params);
+    try {
+      for (const track of songs.data.items.slice(0,5)) {
+        const id=String(track.base_info?.id || track.id);
+        const source=await qishuiRequest('audio',{id,quality:'standard'});
+        if (!source.ok) continue;
+        qishui.preview=Boolean(source.data.preview);
+        await nativeAudio('setGain',{value:0.05});
+        await nativeAudio('prepare',{source:source.data.url,sourceId:'ci-qishui'});
+        await nativeAudio('play');
+        await delay(1500);
+        const status=await nativeAudio('status');
+        qishui.nativePlaying=Boolean(status.playing && status.position>0);
+        break;
+      }
+    } finally {await nativeAudio('pause');}
+    if (!qishui.nativePlaying) throw new Error('Qishui native playback did not advance');
     // Record both provider refusals and bridge failures before failing the check.
     const qq = {search:false,qrVisible:false,authenticatedPlayback:'requires user scan'};
     try {
@@ -118,23 +152,31 @@ if (webViewMajor >= 95) {
       qq.searchResponse = {code:response?.code,diagnostic:response?.diagnostic,file:response?.file,status:response?.status,outerCode:response?.body?.code,requestCode:response?.body?.request?.code};
       const songs = response?.body?.request?.data?.body?.song?.list;
       qq.search = Array.isArray(songs) && songs.length > 0 && Boolean(songs[0].mid || songs[0].songmid);
+      // QQ now refuses anonymous search on both the unchanged stable bridge and the upstream Lite RPC.
+      // Record the explicit provider refusal; HTTP/bridge failures and unexpected shapes still fail.
+      qq.anonymousSearchRefused = response?.status === 200 && response?.body?.code === 0 && response?.body?.request?.code === 2001;
+      if (qq.anonymousSearchRefused) qq.authenticatedSearch = 'requires user scan';
       const account = document.querySelector('[data-bravais-account-toggle]');
       if (!account) throw new Error('Account entry unavailable');
       account.click(); await delay(500);
-      const qqButton = document.querySelector('[data-bravais-account-provider="qq"] button');
-      if (!qqButton || qqButton.disabled) throw new Error('QQ connection button unavailable');
-      qqButton.click(); await delay(1000);
+      let qqRow;
+      for (let attempt=0;attempt<20;attempt++) {
+        qqRow = document.querySelector('[role="dialog"] [role="option"][data-row="qq"]');
+        if (qqRow) break;
+        await delay(250);
+      }
+      if (!qqRow || qqRow.getAttribute('aria-disabled') === 'true') throw new Error('QQ connection entry unavailable');
+      qqRow.click(); await delay(1000);
 
       for (let attempt = 0; attempt < 90; attempt++) {
-        const image = document.querySelector('[data-bravais-account-login="qq"] img[alt="QR Code"]');
+        const selected = document.querySelector('[role="dialog"] [data-row="qq"][aria-selected="true"]');
+        const image = selected && document.querySelector('[role="dialog"] img.login-code');
         if (image?.complete && image.naturalWidth > 100 && image.src.startsWith('data:image/')) { qq.qrVisible = true; break; }
-        const method = document.querySelector('[data-bravais-login-method="qq"]') || document.querySelector('[data-bravais-login-method]');
-        if (method && method.getAttribute('aria-pressed') !== 'true') method.click();
         await delay(1000);
       }
-      qq.dialogText = document.querySelector('[data-bravais-account-login="qq"]')?.textContent?.slice(0,400);
+      qq.dialogText = document.querySelector('[role="dialog"]')?.textContent?.slice(0,400);
     } catch (error) { qq.error = error.message; }
-    return {embeddedQr:true, network, back:true, media, qq};
+    return {embeddedQr:true, network, back:true, media, qq, qishui};
   })()`}}));
   const inspected = await result;
   native.close();
@@ -142,5 +184,6 @@ if (webViewMajor >= 95) {
   writeFileSync('artifacts/embedded-music.json', JSON.stringify(inspected.result.result.value, null, 2));
   if (Object.values(inspected.result.result.value.media || {}).some(value => !value.playing || !value.seek)) throw new Error('Provider audio playback/seek did not pass');
   console.log('Embedded music:', inspected.result.result.value);
-  if (!inspected.result.result.value.qq?.search || !inspected.result.result.value.qq?.qrVisible) throw new Error('QQ search/QR verification failed');
+  const qq = inspected.result.result.value.qq;
+  if ((!qq?.search && !qq?.anonymousSearchRefused) || !qq?.qrVisible || qq?.error) throw new Error('QQ transport/QR verification failed');
 }

@@ -63,3 +63,8 @@ android/app/.cxx/
 android/app/src/main/assets/music-runtime.zip
 
 probe-dist/
+
+# Generated copies of the pinned upstream protocol bridge.
+/mobile/runtime/qishui/
+/mobile/runtime/kugou/
+/mobile/runtime/osEncryption.cjs

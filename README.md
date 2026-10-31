@@ -2,15 +2,17 @@
 
 面向比亚迪 DiLink 100 / UI 7.0 的长期维护 Android 适配分支。无需 Android Studio，也不需要自行部署音乐服务器；从本仓库 Releases 下载 APK。
 
-**原项目：[chthollyphile/folia-major](https://github.com/chthollyphile/folia-major)**，作者 chthollyphile 与上游贡献者。本项目基于 **v0.7.20**，保留 AGPL-3.0 许可证及原作者版权，非比亚迪或音乐平台官方客户端。旧版 R1–R10 来自 [folia-sonnet](https://github.com/chthollyphile/folia-sonnet) 0.6.7；完整来源及提交见 [UPSTREAM.json](UPSTREAM.json)。
+**原项目：[chthollyphile/folia-major](https://github.com/chthollyphile/folia-major)**，作者 chthollyphile 与上游贡献者。本项目基于 **v0.7.25**，保留 AGPL-3.0 许可证及原作者版权，非比亚迪或音乐平台官方客户端。旧版 R1–R10 来自 [folia-sonnet](https://github.com/chthollyphile/folia-sonnet) 0.6.7；完整来源及提交见 [UPSTREAM.json](UPSTREAM.json)。
 
 ## 新基线
 
-- Major 0.7.20 的完整内置前端：Bravais 资料库墙面、Lattice 播放视图、设置与主题。
-- 14 种内置歌词可视化和 6 类背景，保留原设置，不删减为少数演示动效。
-- 网易云、酷狗、QQ 音乐通过包内服务连接；账号权限、地区及平台限制仍适用。
+- Major 0.7.25 的完整内置前端：Bravais 资料库墙面、Lattice 播放视图、设置与主题。
+- 17 种内置歌词可视化和 6 类背景，保留原设置，不删减为少数演示动效。
+- 网易云、酷狗、QQ 音乐、汽水音乐通过包内服务连接；账号权限、地区及平台限制仍适用。
 - Android 原生播放器、媒体音量、音频焦点、媒体会话和方向盘控制；保留 BYD 三分屏声明。
 - 窄窗设置滚动、无名动效全屏、5 秒隐藏控件、多指手势、可选本机播放频谱。
+
+汽水音乐使用上游 0.2.2 车机协议，二维码登录、搜索、推荐、歌单、歌词与明文音频均走包内服务；平台返回受保护音频时仅播放其公开提供的试听，不解密受保护资源。
 
 桌面专用的 Electron 模组、壁纸、Discord、窗口捕获、FFmpeg 导出与本地 AI 分轨不能直接在 Android 上执行。Android 仍使用单个原生播放器，双播放器 Automix、WebAudio 均衡器与桌面输出设备选择不启用；这些限制不等于内置视觉模式缺失。详见 [维护说明](docs/MAINTENANCE.md)。
 

@@ -5,7 +5,9 @@ import subprocess, urllib.request, zipfile, shutil, hashlib
 repo = Path(__file__).resolve().parents[1]
 runtime = repo / 'mobile/runtime'
 subprocess.run(['npm', 'ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=runtime, check=True)
-shutil.copyfile(repo / 'electron/kugouApiBridge.cjs', runtime / 'kugouApiBridge.cjs')
+shutil.copytree(repo / 'electron/kugou', runtime / 'kugou', dirs_exist_ok=True)
+shutil.copyfile(repo / 'electron/osEncryption.cjs', runtime / 'osEncryption.cjs')
+shutil.copytree(repo / 'electron/qishui', runtime / 'qishui', dirs_exist_ok=True)
 assets = repo / 'android/app/src/main/assets'
 assets.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(assets / 'music-runtime.zip', 'w', zipfile.ZIP_DEFLATED) as output:

@@ -1,7 +1,7 @@
 import { isCapacitorAndroid } from '../../../platform/runtime';
 import { fitCarLyricBlock } from './carCamera';
 import type { Theme } from '../../../types';
-import type { FumeBackgroundScene } from '../FumeBackground';
+import type { FumeBackgroundScene } from './FumeBackground';
 import type { CameraRetargetState, CameraTarget, CameraViewTarget, FumeArticleLayout, ViewportSize } from './fumeTypes';
 import { clamp, easeInOutCubic, easeOutCubic, mix, quadraticBezier } from './fumeMath';
 import { resolvePrintedGraphemeCount, resolvePrintedGraphemeProgress } from './fumeReveal';

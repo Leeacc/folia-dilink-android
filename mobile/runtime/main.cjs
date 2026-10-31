@@ -3,7 +3,9 @@ const path = require('node:path');
 const http = require('node:http');
 const { serveQq, requestQq } = require('./qqBridge.cjs');
 const { createPrivateStorage } = require('./privateStorage.cjs');
-const { createKugouApiBridge } = require('./kugouApiBridge.cjs');
+const { createKugouApiBridge } = require('./kugou/kugouApiBridge.cjs');
+const { createQishuiApiBridge } = require('./qishui/qishuiApiBridge.cjs');
+const { createPrivateStore } = require('./privateStore.cjs');
 
 require('./compat.cjs').installUtf8DecoderCompat();
 
@@ -44,15 +46,26 @@ const kugou = createKugouApiBridge({
   } }),
 });
 
+const qishui = createQishuiApiBridge({
+  store: createPrivateStore(stateDir, 'qishui-session.json'),
+  safeStorage: createPrivateStorage(stateDir),
+  log: () => {},
+  warn: () => console.warn('[Qishui] Private music request failed'),
+});
+
 async function dispatch(provider, endpoint, method = 'GET', payload = '') {
+  if (provider === 'qishui') {
+    if (!/^\/[a-z_]+$/.test(endpoint) || method !== 'POST') throw new Error('Invalid Qishui operation');
+    return qishui.request(endpoint.slice(1), JSON.parse(payload || '{}'));
+  }
   if (provider === 'qq') {
-    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
+    if (!/^\/(login\/|logout(?:\?|$)|user\/|recommend\/|search(?:\?|$)|radio\/|song\/|get[A-Za-z]+(?:\/|\?|$))/.test(endpoint)) throw new Error('Invalid QQ operation');
     return requestQq(endpoint, stateDir, server.address().port, secret, method, payload);
   }
   const url = new URL(endpoint, 'http://localhost');
   const operation = url.pathname.slice(1).replace(/\//g, '_');
   if (!/^[a-zA-Z0-9_]+$/.test(operation)) throw new Error('Invalid operation');
-  const params = Object.fromEntries(url.searchParams);
+  const params = provider === 'kugou' && method === 'POST' ? JSON.parse(payload || '{}') : Object.fromEntries(url.searchParams);
   // No externally supplied proxy or target host is accepted by the embedded service.
   delete params.proxy; delete params.domain; delete params.realIP;
   if (provider === 'kugou') return kugou.request(operation, params);
@@ -77,7 +90,7 @@ const server = http.createServer(async (req, res) => {
     try { return serveQq(req, res, stateDir); }
     catch { res.writeHead(503); res.end(JSON.stringify({code:503,message:'QQ music runtime unavailable'})); return; }
   }
-  if (req.url === '/health') { res.end(JSON.stringify({ ready: true, node: process.version, providers: ['netease', 'kugou', 'qq'] })); return; }
+  if (req.url === '/health') { res.end(JSON.stringify({ ready: true, node: process.version, providers: ['netease', 'kugou', 'qq', 'qishui'] })); return; }
   if (req.method !== 'POST' || req.url !== '/request') { res.writeHead(404); res.end('{}'); return; }
   try {
     let raw = '';

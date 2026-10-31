@@ -9,12 +9,12 @@ html[data-runtime="capacitor-android"] .now-playing-toast [data-toast-card] {
 }
 /* Preserve the existing narrow-fullscreen clearance as well. */
 @media (max-width: 1200px) {
-    html[data-runtime="capacitor-android"] .now-playing-toast { margin-bottom: 144px; }
+    html[data-runtime="capacitor-android"] .now-playing-toast:not([data-card-custom-position]) { margin-bottom: 144px; }
 }
 /* Anchor to the pane centre, independently of the animated x transform and song length.
    Native multi-window state keeps narrow fullscreen windows on their original layout. */
-html[data-runtime="capacitor-android"][data-car-window="split"] .now-playing-toast {
-    left: 50%;
+html[data-runtime="capacitor-android"][data-car-window="split"] .now-playing-toast:not([data-card-custom-position]) {
+    left: 50% !important;
     width: min(320px, calc(100vw - 48px));
     margin-left: max(-160px, calc(-50vw + 24px));
     margin-bottom: 144px;

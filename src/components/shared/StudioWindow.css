@@ -1,0 +1,6 @@
+/* Old car WebViews must grow the stacked sample to contain its preview and style shelf. */
+@supports not (width: 1cqw) {
+    @media (max-width: 1023px) {
+        .studio-window-stage { height: auto; }
+    }
+}
