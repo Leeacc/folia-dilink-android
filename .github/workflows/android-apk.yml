@@ -65,25 +65,6 @@ jobs:
         run: npm run test:unit -- test/unit/platform/nativeAudio.test.ts
       - name: Build and sync original Folia UI
         run: npm run cap:sync:android
-      - name: Compile isolated UI fixtures for Chromium 95
-        run: FOLIA_UI_PROBES=1 npm run build:capacitor -- --outDir probe-dist
-      - name: Verify compiled UI on Chromium 95
-        run: |
-          npm install --prefix "$RUNNER_TEMP/legacy-pw" --ignore-scripts --no-audit --no-fund playwright@1.15.2
-          curl -fL --retry 3 https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/918973/chromium-linux.zip -o "$RUNNER_TEMP/chromium95.zip"
-          unzip -q "$RUNNER_TEMP/chromium95.zip" -d "$RUNNER_TEMP/chromium95"
-          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/preview.log" 2>&1 &
-          npm run preview -- --host 127.0.0.1 --port 4191 --outDir probe-dist > "$RUNNER_TEMP/probes.log" 2>&1 &
-          sleep 3
-          FOLIA_REQUIRE_CHROMIUM95=1 FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-major-ui.cjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: chromium95-ui-check
-          path: |
-            artifacts/chromium95/
-            artifacts/major-ui/
-          if-no-files-found: ignore
       - name: Package embedded music runtime
         run: python3 mobile/prepare.py
       - uses: actions/setup-node@v4
@@ -139,6 +120,45 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  ui-check:
+    if: ${{ !inputs.apk_run_id }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+      VITE_NETEASE_API_BASE: ${{ vars.VITE_NETEASE_API_BASE }}
+      VITE_KUGOU_API_BASE: ${{ vars.VITE_KUGOU_API_BASE }}
+      VITE_FOLIA_API_BASE: ${{ vars.VITE_FOLIA_API_BASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install locked UI dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Build production UI from the same source revision
+        run: npm run build:capacitor
+      - name: Compile isolated UI fixtures for Chromium 95
+        run: FOLIA_UI_PROBES=1 npm run build:capacitor -- --outDir probe-dist
+      - name: Verify compiled UI on Chromium 95
+        run: |
+          npm install --prefix "$RUNNER_TEMP/legacy-pw" --ignore-scripts --no-audit --no-fund playwright@1.15.2
+          curl -fL --retry 3 https://cdn.playwright.dev/dbazure/download/playwright/builds/chromium/918973/chromium-linux.zip -o "$RUNNER_TEMP/chromium95.zip"
+          unzip -q "$RUNNER_TEMP/chromium95.zip" -d "$RUNNER_TEMP/chromium95"
+          npm run preview -- --host 127.0.0.1 > "$RUNNER_TEMP/preview.log" 2>&1 &
+          npm run preview -- --host 127.0.0.1 --port 4191 --outDir probe-dist > "$RUNNER_TEMP/probes.log" 2>&1 &
+          sleep 3
+          FOLIA_REQUIRE_CHROMIUM95=1 FOLIA_LEGACY_PLAYWRIGHT="$RUNNER_TEMP/legacy-pw/node_modules/playwright" FOLIA_CHROMIUM_EXECUTABLE="$RUNNER_TEMP/chromium95/chrome-linux/chrome" node ci/check-major-ui.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: chromium95-ui-check
+          path: |
+            artifacts/chromium95/
+            artifacts/major-ui/
+          if-no-files-found: ignore
+
   smoke-test:
     if: ${{ always() && (needs.build.result == 'success' || (needs.build.result == 'skipped' && inputs.apk_run_id != '')) }}
     needs: build
@@ -185,8 +205,8 @@ jobs:
           retention-days: 30
 
   publish:
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.runtime_probe }}
-    needs: [build, smoke-test]
+    if: ${{ startsWith(github.ref, 'refs/tags/v') && !inputs.runtime_probe && needs['ui-check'].result == 'success' }}
+    needs: [build, smoke-test, ui-check]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

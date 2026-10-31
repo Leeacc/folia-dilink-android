@@ -1,5 +1,8 @@
 name: Diagnose legacy WebGL driver
 on:
+  push:
+    branches: ["migration/**"]
+    paths: [".github/workflows/legacy-gpu-diagnostic.yml", "ci/check-nebbia.cjs"]
   workflow_dispatch:
 permissions:
   contents: read
